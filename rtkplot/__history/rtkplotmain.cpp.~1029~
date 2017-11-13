@@ -1,0 +1,1220 @@
+//---------------------------------------------------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <io.h>
+#include <string.h>
+#include <stdarg.h>
+#include <vcl.h>
+#include <inifiles.hpp>
+#include <Clipbrd.hpp>
+
+#pragma hdrstop
+
+#include "rtkplotmain.h"
+#include "rtklib.h"
+#include "rtkplotopt.h"
+#include "rtkplotallassess.h"
+#include "LSNMAIN.h"
+
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TrtkplotMainWindow *rtkplotMainWindow;
+//---------------------------------------------------------------------------
+__fastcall TrtkplotMainWindow::TrtkplotMainWindow(TComponent* Owner)
+	: TForm(Owner)
+{
+	QFlag->Visible = false;
+	BtnSol1->Visible = false;
+	BtnSol2->Visible = false;
+	BtnSol12->Visible = false;
+
+	ObsType->Visible = true;
+
+	gtime_t t0 = {0};
+	nav_t nav0={0};
+	obs_t obs0={0};
+	sta_t sta0={0};
+	solstatbuf_t solstat0={0};
+	AnsiString s;
+	double ep[]={2000,1,1,0,0,0},xl[2],yl[2];
+	double xs[]={-DEFTSPAN/2,DEFTSPAN/2};
+	int i,j,k,nfreq=NFREQ;
+	char file[1024]="testrtkplot.exe",*p;
+
+	::GetModuleFileName(NULL,file,sizeof(file));
+	//::GetModuleFileName(NULL,(wchar_t*)file,sizeof(file));
+	if (!(p=strrchr(file,'.')))
+		p=file+strlen(file);
+	strcpy(p,".ini");
+	this->IniFile = file;
+
+    FormWidth=FormHeight=0;
+    Drag=0; Xn=Yn=-1; NObs=0;
+    IndexObs=NULL;
+    Week=Flush=PlotType=0;
+	AnimCycle=1;
+	for(i=0;i<2;i++)
+	{
+		initsolbuf(SolData+i,0,0);
+		SolStat[i]=solstat0;
+		SolIndex[i]=0;
+	}
+	ObsIndex=0;
+    Obs=obs0;
+    Nav=nav0;
+    Sta=sta0;
+	SimObs=0;
+
+	X0=Y0=Xc=Yc=Xs=Ys=Xcent=0.0;
+    GEState=GEDataState[0]=GEDataState[1]=0;
+    GEHeading=0.0;
+    OEpoch=t0;
+    for (i=0;i<3;i++) OPos[i]=OVel[i]=0.0;
+    Az=El=NULL;  Intervals=NULL;
+	for (i=0;i<NFREQ+NEXOBS;i++) {
+		Mp[i]=NULL;
+		CycleSlipMark[i]=NULL;
+		Ion[i] = NULL;
+    }
+	OpenFiles  =new TStringList;
+    SolFiles[0]=new TStringList;
+    SolFiles[1]=new TStringList;
+    ObsFiles   =new TStringList;
+	NavFiles   =new TStringList;
+    Buff    =new Graphics::TBitmap;
+    MapImage=new Graphics::TBitmap;
+    SkyImageI=new Graphics::TBitmap;
+    SkyImageR=new Graphics::TBitmap;
+	GraphT = new TGraph(Disp);
+	GraphT->Fit = 0;
+    for (i=0;i<3;i++) {
+        GraphG[i]=new TGraph(Disp);
+		GraphG[i]->XLPos=0;
+		GraphG[i]->GetLim(xl,yl);
+		GraphG[i]->SetLim(xs,yl);
+    }
+    GraphR=new TGraph(Disp);
+    for (i=0;i<2;i++) {
+        GraphE[i]=new TGraph(Disp);
+    }
+    GraphS=new TGraph(Disp);
+    GraphR->GetLim(xl,yl);
+	GraphR->SetLim(xs,yl);
+
+    MapSize[0]=MapSize[1]=0;
+    MapScaleX=MapScaleY=0.1;
+    MapScaleEq=0;
+    MapLat=MapLon=0.0;
+
+	SkySize[0]=SkySize[1]=SkyCent[0]=SkyCent[1]=0;
+    SkyScale=SkyScaleR=240.0;
+    SkyFov[0]=SkyFov[1]=SkyFov[2]=0.0;
+    SkyElMask=1;
+    SkyDestCorr=SkyRes=SkyFlip=0;
+    for (i=0;i<10;i++) SkyDest[i]=0.0;
+
+    for (i=0;i<3;i++) TimeEna[i]=0;
+    TimeLabel=AutoScale=ShowStats=0;
+    ShowLabel=ShowGLabel=1;
+    ShowArrow=ShowSlip=ShowHalfC=ShowErr=ShowEph=0;
+    PlotStyle=MarkSize=Origin=RcvPos=0;
+    TimeInt=ElMask=YRange=0.0;
+	MaxDop=30.0;
+	MaxMP=10.0;
+
+    TimeStart=TimeEnd=epoch2time(ep);
+	DoubleBuffered=true;
+
+	//Console1=new TConsole(Owner);
+    //Console2=new TConsole(Owner);
+
+	for (i=0;i<361;i++) ElMaskData[i]=0.0;
+
+    Trace=0;
+    ConnectState=OpenRaw=0;
+    RtConnType=0;
+	strinitcom();
+	strinit(Stream  );
+	strinit(Stream+1);
+
+    FrqType->Items->Clear();
+    FrqType->Items->Add("L1/LC");
+    if (nfreq>=2) FrqType->Items->Add("L2");
+    if (nfreq>=3) FrqType->Items->Add("L5");
+    if (nfreq>=4) FrqType->Items->Add("L6");
+    if (nfreq>=5) FrqType->Items->Add("L7");
+    if (nfreq>=6) FrqType->Items->Add("L8");
+	FrqType->ItemIndex=0;
+
+	TLEData.n = TLEData.nmax = 0;
+	TLEData.data = NULL;
+
+	BtnShowSkyplot->Down = true;
+
+	//for(i=0;i<NUMSYS;i++)
+	//	for(j=0;j<NFREQ+NEXOBS;j++)
+	//		obstypes[i][j][0]='\0';
+	for(i=0;i<6;i++)
+		for(j=0;j<NFREQ+NEXOBS;j++)
+			for(k=0;k<8;k++)
+				summaryVal[i][j][k]=0.0;
+	for(i=0;i<6;i++)
+		for(k=0;k<8;k++)
+			summaryVal_sys[i][k]=0.0;
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::FormCreate(TObject *Sender)
+{
+	::DragAcceptFiles(Handle,true);
+}
+//---------------------------------------------------------------------------
+TStringList* __fastcall Isdir(AnsiString cbl,AnsiString filetype)
+{
+	TSearchRec sr;
+	TStringList* result = new TStringList();
+	String cdir;
+	String path = cbl;
+	if(!FindFirst(path+"\\*."+filetype,faAnyFile,sr)){
+		do{
+			if(sr.Name!="."&&sr.Name!="..") {
+				cdir = path +"\\"+sr.Name;
+				result->Add(cdir);
+            }
+		}while(FindNext(sr)==0);
+		FindClose(sr);
+	}
+	return result;
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::BtnOpenfileClick(TObject *Sender)
+{
+	trace(3,"BtnOpenfileClick\n");
+	OpenObsDialog->FilterIndex = 1; //RINEX OBS (*.obs,*.*o,*.*d)
+	if(!OpenObsDialog->Execute())
+		return;
+	ReadObs(OpenObsDialog->Files);
+
+	//批量计算多个文件（这样会出现内存不足）
+	/*int i,j;
+	for(i = 282; i < 290;i++) {
+		TStringList *files1 = Isdir("Z:\\data\\rinex\\daily\\2016\\"+IntToStr(i),"16o");
+		char filename[1024];
+		for(j=0;j<files1->Count;j++){
+			try{
+             	TStringList *files = new TStringList();
+				files->Add(files1->Strings[j]);
+				strcpy(filename,U2A(files1->Strings[j]).c_str());
+				ReadObs(files);
+
+				char *tempname; tempname = strrchr(filename,'\\');
+				AnsiString a_tempname = tempname;
+
+				AnsiString path = ExtractFilePath(Application->ExeName) +"\\"+IntToStr(i);
+				if (_access(path.c_str(),0)==-1)
+					CreateDirectory(path.c_str(), NULL);
+				AnsiString file = path +"\\"+a_tempname.SubString(2,4).UpperCase()+IntToStr(i)+".txt";
+				if(_access(file.c_str(),0)!=-1) continue;
+
+				ComputeSummary(file);
+            }
+			catch(...){
+                 continue;
+            }
+		}
+		TStringList *files2 = Isdir("Z:\\data\\rinex\\daily\\2016\\"+IntToStr(i)+"\\iGMASdaily","16o");
+		for(j=0;j<files2->Count;j++) {
+			try{
+            	TStringList *files = new TStringList();
+				files->Add(files2->Strings[j]);
+				strcpy(filename,U2A(files2->Strings[j]).c_str());
+				ReadObs(files);
+
+				char *tempname; tempname = strrchr(filename,'\\');
+				AnsiString a_tempname = tempname;
+
+					AnsiString path = ExtractFilePath(Application->ExeName) +"\\"+IntToStr(i);
+				if (_access(path.c_str(),0)==-1)
+					CreateDirectory(path.c_str(), NULL);
+				AnsiString file = path +"\\"+a_tempname.SubString(2,4).UpperCase()+IntToStr(i)+".txt";
+				if(_access(file.c_str(),0)!=-1) continue;
+				ComputeSummary(file);
+            }
+			catch(...){
+                continue;
+            }
+		}
+
+		//AnsiString stri; stri.printf("%03d",i);
+		//AnsiString str2 = "I:\\glldata\\iGMAS\\obs\\"+stri;
+
+		//TStringList *files = new TStringList();
+		//files->Add(A2U(str2+"\\"+names[j]+stri+"0\\gal\\"+names[j]+stri+"0.obs"));
+		//ReadObs(files);
+
+		//ComputeObservationPerSlip("F:\\Users\\dell\\Desktop\\"+stri+".txt");
+		//ComputeDataIntegrityRate(str2+"\\g_Iratio_"+names[j]+stri+".txt");
+		//ComputeMP(str2+"\\g_MP_"+names[j]+stri+".txt");
+		//ComputeCNR(str2+"\\g_CNR_"+names[j]+stri+".txt");
+		//ComputeCn(str2+"\\g_Cn_"+names[j]+stri+".txt");
+		//ComputePn(str2+"\\g_Pn_"+names[j]+stri+".txt");
+		//ComputeObservationPerSlip(str2+"\\g_oslp_"+names[j]+stri+".txt");
+		//ComputeIon(str2+"\\g_Ion_"+names[j]+stri+".txt");
+	}*/
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::DispPaint(TObject *Sender)
+{
+	trace(3,"DispPaint\n");
+    UpdateDisp();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::FormShow(TObject *Sender)
+{
+	AnsiString cmd,s;
+	int i,argc=0;
+	char *p,*argv[32],buff[1024],*path1="",*path2="";
+
+	trace(3,"FormShow\n");
+
+	/*cmd = GetCommandLine();
+	strcpy(buff,cmd.c_str());
+
+	for(p=buff;*p&&argc<32;p++)
+	{
+		if(*p==' ') continue;
+		if(*p=='"'){
+			argv[argc++]=p+1;
+			if(!(p=strchr(p+1,'"')))
+				break;
+		}
+		else {
+			argv[argc++]=p;
+			if(!(p=strchr(p+1,' '))) break;
+		}
+		*p='\0';
+	}*/
+	/*for(i=1;i<argc;i++)
+		if(!strcmp(argv[i],"-i")&&i+1<argc)
+			IniFile=argv[++i];*/
+	LoadOpt();
+
+	/*for(i=1;i<argc;i++){
+		if(!strcmp(argv[i],"-r")) OpenRaw = 1;
+		else if(!strcmp(argv[i],"-p")&&i+1<argc) path1=argv[++i];
+        else if (!strcmp(argv[i],"-p1")&&i+1<argc) path1=argv[++i];
+        else if (!strcmp(argv[i],"-p2")&&i+1<argc) path2=argv[++i];
+        else if (!strcmp(argv[i],"-t" )&&i+1<argc) Title=argv[++i];
+        else if (!strcmp(argv[i],"-x" )&&i+1<argc) Trace=atoi(argv[++i]);
+        else {
+            OpenFiles->Add(argv[i]);
+		}
+	}*/
+	//UpdateType(PlotType>=PLOT_OBS?PLOT_TRK:PlotType);
+	UpdateType(-1);  //setting PlotType=-1
+
+	UpdateColor();
+    UpdateSatMask();
+	//UpdateOrigin();
+    UpdateEnable();
+
+    if (Trace>0) {
+        traceopen(TRACEFILE);
+        tracelevel(Trace);
+	}
+
+    if (TLEFile!="") {
+        tle_read(TLEFile.c_str(),&TLEData);
+    }
+    if (TLESatFile!="") {
+        tle_name_read(TLESatFile.c_str(),&TLEData);
+    }
+
+	UpdatePlot();
+
+	cmd = GetCommandLine();
+	strcpy(buff,cmd.c_str());
+
+	for(p=buff;*p&&argc<32;p++)
+	{
+		if(*p==' ') continue;
+		if(*p=='"'){
+			argv[argc++]=p+1;
+			if(!(p=strchr(p+1,'"')))
+				break;
+		}
+		else {
+			argv[argc++]=p;
+			if(!(p=strchr(p+1,' '))) break;
+		}
+		*p='\0';
+	}
+
+	AnsiString obsfile,outfile;
+	for(i=1;i<argc;i++){
+		if(i==1) obsfile = argv[i];
+        if(i==2) outfile = argv[i];
+	}
+
+	if(argc>=3) {
+		try{
+        	TStringList *files = new TStringList();
+			files->Add(A2U(obsfile));
+			ReadObs(files);
+
+			if(_access(outfile.c_str(),0)!=-1) return;
+			ComputeSummary(outfile);
+            MainForm->Close();
+		}
+		catch(...){
+			MainForm->Close();
+            return;
+		}
+    }
+
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::LoadOpt()
+{
+	TIniFile *ini = new TIniFile(IniFile);
+	AnsiString s,s1;
+	double range;
+	char rangelist[64];
+	int i,geopts[12];
+
+	trace(3,"LoadOpt\n");
+
+	PlotType = ini->ReadInteger("Plot","plottype",-1);
+	TimeLabel    =ini->ReadInteger("plot","timelabel",     1);
+    LatLonFmt    =ini->ReadInteger("plot","latlonfmt",     0);
+    AutoScale    =ini->ReadInteger("plot","autoscale",     1);
+    ShowStats    =ini->ReadInteger("plot","showstats",     0);
+    ShowLabel    =ini->ReadInteger("plot","showlabel",     1);
+    ShowGLabel   =ini->ReadInteger("plot","showglabel",    1);
+    ShowCompass  =ini->ReadInteger("plot","showcompass",   0);
+    ShowScale    =ini->ReadInteger("plot","showscale",     1);
+    ShowArrow    =ini->ReadInteger("plot","showarrow",     0);
+    ShowSlip     =ini->ReadInteger("plot","showslip",      0);
+    ShowHalfC    =ini->ReadInteger("plot","showhalfc",     0);
+    ShowErr      =ini->ReadInteger("plot","showerr",       0);
+    ShowEph      =ini->ReadInteger("plot","showeph",       0);
+    PlotStyle    =ini->ReadInteger("plot","plotstyle",     0);
+    MarkSize     =ini->ReadInteger("plot","marksize",      2);
+	NavSys       =ini->ReadInteger("plot","navsys",  SYS_GPS);
+	//NavSys = ini->ReadInteger("plot","navsys",SYS_GPS|SYS_GLO|SYS_GAL|SYS_CMP);
+	AnimCycle    =ini->ReadInteger("plot","animcycle",    10);
+    RefCycle     =ini->ReadInteger("plot","refcycle",    100);
+    HideLowSat   =ini->ReadInteger("plot","hidelowsat",    0);
+    ElMaskP      =ini->ReadInteger("plot","elmaskp",       0);
+    ExSats       =ini->ReadString ("plot","exsats",       "");
+    RtBuffSize   =ini->ReadInteger("plot","rtbuffsize",10800);
+    RtStream[0]  =ini->ReadInteger("plot","rtstream1",     0);
+    RtStream[1]  =ini->ReadInteger("plot","rtstream2",     0);
+    RtFormat[0]  =ini->ReadInteger("plot","rtformat1",     0);
+    RtFormat[1]  =ini->ReadInteger("plot","rtformat2",     0);
+    RtTimeForm   =ini->ReadInteger("plot","rttimeform",    0);
+    RtDegForm    =ini->ReadInteger("plot","rtdegform",     0);
+    RtFieldSep   =ini->ReadString ("plot","rtfieldsep",   "");
+    RtTimeOutTime=ini->ReadInteger("plot","rttimeouttime", 0);
+	RtReConnTime =ini->ReadInteger("plot","rtreconntime",10000);
+
+    MColor[0][0]=(TColor)ini->ReadInteger("plot","mcolor0", (int)clSilver );
+    MColor[0][1]=(TColor)ini->ReadInteger("plot","mcolor1", (int)clGreen  );
+    MColor[0][2]=(TColor)ini->ReadInteger("plot","mcolor2",      0x00AAFF );
+    MColor[0][3]=(TColor)ini->ReadInteger("plot","mcolor3", (int)clFuchsia);
+    MColor[0][4]=(TColor)ini->ReadInteger("plot","mcolor4", (int)clBlue   );
+    MColor[0][5]=(TColor)ini->ReadInteger("plot","mcolor5", (int)clRed    );
+    MColor[0][6]=(TColor)ini->ReadInteger("plot","mcolor6", (int)clTeal   );
+    MColor[0][7]=(TColor)ini->ReadInteger("plot","mcolor7", (int)clGray   );
+    MColor[1][0]=(TColor)ini->ReadInteger("plot","mcolor8", (int)clSilver );
+    MColor[1][1]=(TColor)ini->ReadInteger("plot","mcolor9",      0x804000 );
+    MColor[1][2]=(TColor)ini->ReadInteger("plot","mcolor10",     0x008080 );
+    MColor[1][3]=(TColor)ini->ReadInteger("plot","mcolor11",     0xFF0080 );
+    MColor[1][4]=(TColor)ini->ReadInteger("plot","mcolor12",     0xFF8000 );
+    MColor[1][5]=(TColor)ini->ReadInteger("plot","mcolor13",     0x8080FF );
+    MColor[1][6]=(TColor)ini->ReadInteger("plot","mcolor14",     0xFF8080 );
+    MColor[1][7]=(TColor)ini->ReadInteger("plot","mcolor15",(int)clGray   );
+    CColor[0]=(TColor)ini->ReadInteger("plot","color1", (int)clWhite  );
+    CColor[1]=(TColor)ini->ReadInteger("plot","color2", (int)clSilver );
+    CColor[2]=(TColor)ini->ReadInteger("plot","color3", (int)clBlack  );
+	CColor[3]=(TColor)ini->ReadInteger("plot","color4", (int)clSilver );
+
+	//RefDialog->StaPosFile=ini->ReadString ("plot","staposfile","");
+	//RefDialog->Format    =ini->ReadInteger("plot","staposformat",0);
+
+    ElMask    =ini->ReadFloat  ("plot","elmask", 0.0);
+    MaxDop    =ini->ReadFloat  ("plot","maxdop",30.0);
+    MaxMP     =ini->ReadFloat  ("plot","maxmp" ,10.0);
+    YRange    =ini->ReadFloat  ("plot","yrange", 5.0);
+    Origin    =ini->ReadInteger("plot","orgin",    2);
+    RcvPos    =ini->ReadInteger("plot","rcvpos",   0);
+    OOPos[0]  =ini->ReadFloat  ("plot","oopos1",   0);
+    OOPos[1]  =ini->ReadFloat  ("plot","oopos2",   0);
+    OOPos[2]  =ini->ReadFloat  ("plot","oopos3",   0);
+    QcCmd     =ini->ReadString ("plot","qccmd","teqc +qc +sym +l -rep -plot");
+    TLEFile   =ini->ReadString ("plot","tlefile", "");
+	TLESatFile=ini->ReadString ("plot","tlesatfile","");
+
+    Font->Charset=ANSI_CHARSET;
+    Font->Name=ini->ReadString ("plot","fontname","Tahoma");
+	Font->Size=ini->ReadInteger("plot","fontsize",8);
+
+	RnxOpts   =ini->ReadString ("plot","rnxopts","");
+
+    for (i=0;i<11;i++) {
+        geopts[i]=ini->ReadInteger("ge",s.sprintf("geopts_%d",i),0);
+	}
+
+	//GoogleEarthView->SetOpts(geopts);
+
+    for (i=0;i<2;i++) {
+        StrCmds  [0][i]=ini->ReadString ("str",s.sprintf("strcmd1_%d",    i),"");
+        StrCmds  [1][i]=ini->ReadString ("str",s.sprintf("strcmd2_%d",    i),"");
+        StrCmdEna[0][i]=ini->ReadInteger("str",s.sprintf("strcmdena1_%d", i), 0);
+        StrCmdEna[1][i]=ini->ReadInteger("str",s.sprintf("strcmdena2_%d", i), 0);
+    }
+    for (i=0;i<3;i++) {
+        StrPaths[0][i]=ini->ReadString ("str",s.sprintf("strpath1_%d",   i),"");
+        StrPaths[1][i]=ini->ReadString ("str",s.sprintf("strpath2_%d",   i),"");
+    }
+    for (i=0;i<10;i++) {
+        StrHistory [i]=ini->ReadString ("str",s.sprintf("strhistry_%d",  i),"");
+        StrMntpHist[i]=ini->ReadString ("str",s.sprintf("strmntphist_%d",i),"");
+    }
+    NWayPnt   =ini->ReadInteger("plot","nmappnt",0);
+    for (i=0;i<NWayPnt;i++) {
+        PntName[i]=ini->ReadString("plot",s.sprintf("pntname%d",i+1),"");
+        s1=ini->ReadString("plot",s.sprintf("pntpos%d",i+1),"0,0,0");
+        PntPos[i][0]=PntPos[i][1]=PntPos[i][2]=0.0;
+        sscanf(s1.c_str(),"%lf,%lf,%lf",PntPos[i],PntPos[i]+1,PntPos[i]+2);
+	}
+	//TTextViewer::Color1=(TColor)ini->ReadInteger("viewer","color1",(int)clBlack);
+	//TTextViewer::Color2=(TColor)ini->ReadInteger("viewer","color2",(int)clWhite);
+	//TTextViewer::FontD=new TFont;
+	//TTextViewer::FontD->Name=ini->ReadString ("viewer","fontname","Courier New");
+	//TTextViewer::FontD->Size=ini->ReadInteger("viewer","fontsize",9);
+
+	//FileSelDialog->Dir=ini->ReadString("solbrows","dir","");
+
+	delete ini;
+
+	/*for(i=0;i<RangeList->Count;i++){
+		strcpy(rangelist,U2A(RangeList->Items->Strings[i]).c_str());
+		if(sscanf(rangelist,"%lf",&range)&&range==YRange)
+			RangeList->Selected[i]=true;
+	}*/
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::FormActivate(TObject *Sender)
+{
+	trace(3,"FormActive\n");
+
+	if(OpenFiles->Count>0)
+	{
+		if(CheckObs(OpenFiles->Strings[0]) || OpenRaw)
+			ReadObs(OpenFiles);
+		//else
+		//	ReadSol(OpenFiles,0);
+	}
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::FormResize(TObject *Sender)
+{
+	trace(3,"FromResize\n");
+	if (FormWidth==Width&&FormHeight==Height)
+		return;
+
+	UpdateSize();
+	Refresh();
+
+	FormWidth =Width;
+	FormHeight=Height;
+}
+// set scale of x-axis ------------------------------------------------------
+void __fastcall TrtkplotMainWindow::SetScaleX(double s)
+{
+    double xs,ys;
+    int i;
+
+    trace(3,"SetScaleX: s=%.3f:\n",s);
+
+    GraphR->GetScale(xs,ys);
+    GraphR->SetScale(s ,ys);
+    for (i=0;i<3;i++) {
+        GraphG[i]->GetScale(xs,ys);
+        GraphG[i]->SetScale(s, ys);
+    }
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::FormMouseWheel(TObject *Sender, TShiftState Shift,
+          int WheelDelta, TPoint &MousePos, bool &Handled)
+{
+	TPoint p(Xn,Yn);
+    double xs,ys,ds=pow(2.0,-WheelDelta/1200.0);
+    int i,area=-1;
+
+    Handled=true;
+
+    trace(4,"MouseWheel: WheelDelta=%d\n",WheelDelta);
+
+	if (Xn<0||Yn<0)
+		return;
+
+	//if (PlotType==PLOT_TRK) { // track-plot
+	if(false) {
+		GraphT->GetScale(xs,ys);
+        GraphT->SetScale(xs*ds,ys*ds);
+    }
+    //else if (PlotType<=PLOT_NSAT||PlotType==PLOT_RES||PlotType==PLOT_SNR) {
+	else if(PlotType==PLOT_CNR || PlotType==PLOT_MP || PlotType == PLOT_Ele) {
+        for (i=0;i<3;i++) {
+			//if (PlotType==PLOT_SNR&&i!=1) continue;
+			if((PlotType==PLOT_CNR || PlotType==PLOT_MP || PlotType == PLOT_Ele)&&i!=1)
+				continue;
+            area=GraphG[i]->OnAxis(p);
+            if (area==0||area==1||area==2) {
+                GraphG[i]->GetScale(xs,ys);
+                GraphG[i]->SetScale(xs,ys*ds);
+            }
+            else if (area==0) break;
+        }
+        if (area==8) {
+            for (i=0;i<3;i++) {
+                GraphG[i]->GetScale(xs,ys);
+                GraphG[i]->SetScale(xs*ds,ys);
+                SetScaleX(xs*ds);
+            }
+        }
+    }
+	//else if (PlotType==PLOT_OBS||PlotType==PLOT_DOP) {
+	else if(PlotType==PLOT_VisSat||PlotType==PLOT_DOP) {
+        area=GraphR->OnAxis(p);
+        if (area==0||area==8) {
+            GraphR->GetScale(xs,ys);
+            GraphR->SetScale(xs*ds,ys);
+            SetScaleX(xs*ds);
+        }
+    }
+	else
+		return;
+
+    Refresh();
+}
+// callback on mouse-down event on observation-data-plot --------------------
+void __fastcall TrtkplotMainWindow::MouseDownObs(int X, int Y)
+{
+    TPoint pnt,p(X,Y);
+    double x,xl[2],yl[2];
+    int area;
+
+    trace(3,"MouseDownObs: X=%d Y=%d\n",X,Y);
+
+	//if (0<=ObsIndex&&ObsIndex<NObs&&!BtnFixHoriz->Down) {
+    if (0<=ObsIndex&&ObsIndex<NObs) {
+        x=TimePos(Obs.data[IndexObs[ObsIndex]].time);
+
+        GraphR->GetLim(xl,yl);
+        GraphR->ToPoint(x,yl[1],pnt);
+
+        if ((X-pnt.x)*(X-pnt.x)+(Y-pnt.y)*(Y-pnt.y)<25) {
+            Screen->Cursor=crSizeWE;
+            Drag=20;
+            Refresh();
+            return;
+        }
+    }
+    GraphR->GetCent(Xc,Yc);
+    GraphR->GetScale(Xs,Ys);
+    area=GraphR->OnAxis(p);
+
+    if (area==0||area==8) {
+        Screen->Cursor=Drag==1?crSizeWE:crHSplit;
+        Drag+=3;
+    }
+	else
+		Drag=0;
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::DispMouseDown(TObject *Sender, TMouseButton Button,
+          TShiftState Shift, int X, int Y)
+{
+	trace(3,"DispMouseDown: X=%d Y=%d\n",X,Y);
+
+	X0=X; Y0=Y; Xcent0=Xcent;
+
+	Drag=Shift.Contains(ssLeft)?1:(Shift.Contains(ssRight)?11:0);
+
+	if(PlotType==PLOT_VisSat||PlotType==PLOT_DOP) {
+		MouseDownObs(X,Y);
+	}
+	else
+		Drag=0;
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::DispMouseLeave(TObject *Sender)
+{
+	trace(3,"DispMouseLeave\n");
+
+	Xn=Yn=-1;
+    Panel22->Visible=false;
+    Message2->Caption="";
+}
+// set center of x-axis -----------------------------------------------------
+void __fastcall TrtkplotMainWindow::SetCentX(double c)
+{
+    double x,y;
+    int i;
+
+    trace(3,"SetCentX: c=%.3f:\n",c);
+
+    GraphR->GetCent(x,y);
+    GraphR->SetCent(c,y);
+    for (i=0;i<3;i++) {
+        GraphG[i]->GetCent(x,y);
+        GraphG[i]->SetCent(c,y);
+    }
+}
+// callback on mouse-move events on observataion-data-plot ------------------
+void __fastcall TrtkplotMainWindow::MouseMoveObs(int X, int Y, double dx, double dy,
+    double dxs, double dys)
+{
+    TPoint p1,p2,p(X,Y);
+    double x,y,xs,ys;
+    int i;
+
+    trace(4,"MouseMoveObs: X=%d Y=%d\n",X,Y);
+
+    if (Drag<=4) {
+        GraphR->GetCent(x,y);
+		//if (!BtnFixHoriz->Down) x=Xc+dx;
+		if(NObs>0)
+			x = Xc +dx;
+		//if (!BtnFixVert ->Down) y=Yc+dy;
+		if(NObs>0)
+			y = Yc +dy;
+        GraphR->SetCent(x,y);
+        SetCentX(x);
+
+        /*if (BtnFixHoriz->Down) {
+            GraphR->GetPos(p1,p2);
+            Xcent=Xcent0+2.0*(X-X0)/(p2.x-p1.x);
+            if (Xcent> 1.0) Xcent= 1.0;
+            if (Xcent<-1.0) Xcent=-1.0;
+		}*/
+    }
+    else if (Drag<=14) {
+        GraphR->GetScale(xs,ys);
+        GraphR->SetScale(Xs*dxs,ys);
+        SetScaleX(Xs*dxs);
+    }
+    else if (Drag==20) {
+        GraphR->ToPos(p,x,y);
+        for (i=0;i<NObs;i++) {
+            if (TimePos(Obs.data[IndexObs[i]].time)>=x) break;
+        }
+        ObsIndex=i<NObs?i:NObs-1;
+        UpdateTime();
+    }
+    //BtnCenterOri->Down=false;
+    Refresh();
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::DispMouseMove(TObject *Sender, TShiftState Shift,
+          int X, int Y)
+{
+	double x,y,xs,ys,dx,dy,dxs,dys;
+
+	if (X==Xn&&Y==Yn)
+		return;
+
+    trace(4,"DispMouseMove: X=%d Y=%d\n",X,Y);
+
+    Xn=X; Yn=Y;
+    dx=(X0-X)*Xs;
+    dy=(Y-Y0)*Ys;
+    dxs=pow(2.0,(X0-X)/100.0);
+    dys=pow(2.0,(Y-Y0)/100.0);
+
+    if (Drag==0) {
+        UpdatePoint(X,Y);
+    }
+	//else if (PlotType==PLOT_TRK) {
+	//    MouseMoveTrk(X,Y,dx,dy,dxs,dys);
+	//}
+	//else if (PlotType<=PLOT_NSAT||PlotType==PLOT_RES||PlotType==PLOT_SNR) {
+	//	MouseMoveSol(X,Y,dx,dy,dxs,dys);
+	//}
+	//else if (PlotType==PLOT_OBS||PlotType==PLOT_DOP) {
+	else if(PlotType==PLOT_VisSat || PlotType==PLOT_DOP) {
+		MouseMoveObs(X,Y,dx,dy,dxs,dys);
+    }
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::DispMouseUp(TObject *Sender, TMouseButton Button,
+          TShiftState Shift, int X, int Y)
+{
+	trace(3,"DispMouseUp: X=%d Y=%d\n",X,Y);
+
+	Drag=0;
+	Screen->Cursor=crDefault;
+	Refresh();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::DopTypeChange(TObject *Sender)
+{
+	trace(3,"DopTypeChange\n");
+
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::ObsTypeChange(TObject *Sender)
+{
+	trace(3,"ObsTypeChange\n");
+
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::PlotTypeSChange(TObject *Sender)
+{
+	int i;
+
+    trace(3,"PlotTypeSChnage\n");
+
+    for (i=0;*PTypes[i];i++) {
+		if (PlotTypeS->Text==PTypes[i])
+			UpdateType(i);
+    }
+    UpdateTime();
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::SatListChange(TObject *Sender)
+{
+	trace(3,"SatListChange\n");
+
+    UpdateSatSel();
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnFitHorizClick(TObject *Sender)
+{
+	trace(3,"BtnFitHorizClick\n");
+
+	//if (PlotType==PLOT_TRK)
+	if(false)
+		FitRange(0);
+	else
+		FitTime();
+	Refresh();
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::BtnClearClick(TObject *Sender)
+{
+	trace(3,"BtnClearClick\n");
+
+	PlotType = -1;
+	ShowMsg("");
+	ShowLegend(NULL);
+	ObsType->Items->Clear();
+	SatList->Items->Clear();
+	Clear();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnAnimateClick(TObject *Sender)
+{
+	trace(3,"BtnAnimateClick\n");
+	UpdateEnable();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnShowTrackClick(TObject *Sender)
+{
+	trace(3,"BtnShowTrackClick\n");
+
+	UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::TimeScrollChange(TObject *Sender)
+{
+	trace(3,"TimeScrollChange\n");
+
+	ObsIndex = TimeScroll->Position;
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::TimerTimer(TObject *Sender)
+{
+	TColor color[]={clRed,clBtnFace,CLORANGE,clGreen,clLime};
+	//TPanel *strstatus[]={StrStatus1,StrStatus2};
+	//TConsole *console[]={Console1,Console2};
+    AnsiString connectmsg="",s;
+    static unsigned char buff[16384];
+	solopt_t opt=solopt_default;
+    const gtime_t ts={0};
+	double tint=TimeEna[2]?TimeInt:0.0,pos[3];
+	int i,j,n,inb,inr,cycle,nmsg[2]={0},stat,istat;
+    int sel=!BtnSol1->Down&&BtnSol2->Down?1:0;
+	char msg[MAXSTRMSG]="",tstr[32];
+
+    trace(4,"TimeTimer\n");
+
+	if(BtnAnimate->Enabled && BtnAnimate->Down) {
+		cycle=AnimCycle<=0?1:AnimCycle;
+
+		//if (PlotType<=PLOT_NSAT||PlotType==PLOT_RES) {
+		if(false)  {
+            SolIndex[sel]+=cycle;
+            if (SolIndex[sel]>=SolData[sel].n-1) {
+                SolIndex[sel]=SolData[sel].n-1;
+                BtnAnimate->Down=false;
+            }
+        }
+        else {
+            ObsIndex+=cycle;
+            if (ObsIndex>=NObs-1) {
+                ObsIndex=NObs-1;
+                BtnAnimate->Down=false;
+            }
+        }
+    }
+	else
+		return;
+
+    UpdateTime();
+    UpdatePlot();
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::BtnOptionsClick(TObject *Sender)
+{
+	trace(3,"BtnOptionsClick\n");
+
+	rtkplotOptDialog->Left = Left+Width/2 - rtkplotOptDialog->Width/2;
+	rtkplotOptDialog->Top = Top + Height/2 - rtkplotOptDialog->Height/2;
+	rtkplotOptDialog->Plot = this;
+
+	if(rtkplotOptDialog->ShowModal() != mrOk)
+		return;
+
+	UpdateColor();
+	UpdateSize();
+	UpdateInfo();
+	UpdateSatMask();
+	UpdateSatList();
+	UpdateEnable();
+	Refresh();
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnFitVertClick(TObject *Sender)
+{
+	FitRange(0);
+	Refresh();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnShowSkyplotClick(TObject *Sender)
+{
+	//BtnShowSkyplot->Down = !BtnShowSkyplot->Down;
+	//if(BtnShowSkyplot->Down==false)
+
+	UpdatePlot();
+}
+//---------------------------------------------------------------------------
+void __fastcall TrtkplotMainWindow::BtnSummaryClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+	if(!SaveDialogOffice->Execute()) return;
+	AnsiString file = SaveDialogOffice->FileName;
+
+	if(SaveDialogOffice->FilterIndex==1 && ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+	if(SaveDialogOffice->FilterIndex==2 && ExtractFileExt(A2U(file)) != ".docx")
+		file = file+".docx";
+	if(SaveDialogOffice->FilterIndex==3 && ExtractFileExt(A2U(file)) != ".doc")
+		file = file+".doc";
+
+	ComputeSummary(file);
+
+
+	MessageBox(Handle,"输出完成","提示框",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnDataIntegrityRateClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	//AnsiString file = "F:\\Users\\dell\\Desktop\\test.txt";
+
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	ComputeDataIntegrityRate(file);
+    MessageBox(Handle,"数据完整率输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnMPClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+    if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	ComputeMP(file);
+	MessageBox(Handle,"多路径误差输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnCNRClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+    if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	ComputeCNR(file);
+	MessageBox(Handle,"载噪比输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnCnClick(TObject *Sender)
+{
+    if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+    if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	ComputeCn(file);
+	MessageBox(Handle,"载波相位噪声输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnPnClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	ComputePn(file);
+	MessageBox(Handle,"伪距噪声输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnObservationsPerSlipClick(TObject *Sender)
+{
+    if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+	//ComputeSlip(file);  //输出周跳个数，不统计总历元，便于调试周跳探测情况
+	ComputeObservationPerSlip(file);  //输出周跳比，总历元/周跳总数
+	MessageBox(Handle,"周跳比输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnIonClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+    ComputeIon(file);
+	MessageBox(Handle,"电离层延迟影响输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnDopClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+    FILE *fp;
+	if(!(fp=fopen(file.c_str(),"w"))) return;
+	fprintf(fp,"%% %-19s %6s %8s %8s %8s %8s (EL>=%.0fdeg)\n","TIME (GPST)",
+			"NSAT","GDOP","PDOP","HDOP","VDOP",ElMask);
+
+	int i,j,ns; double azel[MAXOBS*2],dop[4];  char tstr[64];
+	gtime_t time;
+    for (i=0;i<NObs;i++) {
+        ns=0;
+        for (j=IndexObs[i];j<Obs.n&&j<IndexObs[i+1];j++) {
+            if (SatMask[Obs.data[j].sat-1]) continue;
+            if (El[j]<ElMask*D2R) continue;
+            if (ElMaskP&&El[j]<ElMaskData[(int)(Az[j]*R2D+0.5)]) continue;
+            azel[  ns*2]=Az[j];
+            azel[1+ns*2]=El[j];
+            ns++;
+        }
+        if (ns<=0) continue;
+
+        dops(ns,azel,ElMask*D2R,dop);
+
+        time=Obs.data[IndexObs[i]].time;
+
+		/*if (TimeLabel==0) {
+            tow=time2gpst(time,&week);
+            sprintf(tstr,"%4d %8.1f ",week,tow);
+        }
+        else if (TimeLabel==1) {
+			time2str(time,tstr,1);
+        }
+        else if (TimeLabel==2) {
+            time2str(gpst2utc(time),tstr,1);
+        }
+        else {
+            time2str(timeadd(gpst2utc(time),9*3600.0),tstr,1);
+		}*/
+		time2str(time,tstr,1);
+        fprintf(fp,"%s %6d %8.1f %8.1f %8.1f %8.1f\n",tstr,ns,dop[0],dop[1],
+                dop[2], dop[3]);
+    }
+
+	fclose(fp);
+
+	MessageBox(Handle,"单历元卫星数和精度因子输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnEleAzClick(TObject *Sender)
+{
+	if(Obs.n<=0) {
+		Application->MessageBoxA(L"没有观测数据,请打开!",L"提示",MB_OK);
+		return;
+	}
+
+	if(!SaveDialog->Execute()) return;
+	AnsiString file = SaveDialog->FileName;
+	if(ExtractFileExt(A2U(file)) != ".txt")
+		file = file+".txt";
+
+    FILE *fp;
+	if(!(fp=fopen(file.c_str(),"w"))) return;
+	fprintf(fp,"%% %-19s %6s %8s %8s\n","TIME (GPST)","SV","AZ(deg)","EL(deg)");
+
+	int i,j,k;
+	char sat[32],tstr[64],*code;
+	gtime_t time;
+    for (i=0;i<MAXSAT;i++) {
+        if (SatMask[i]||!SatSel[i]) continue;
+        satno2id(i+1,sat);
+
+        for (j=0;j<Obs.n;j++) {
+            if (Obs.data[j].sat!=i+1) continue;
+
+            /*for (k=0;k<NFREQ+NEXOBS;k++) {
+                if (strstr(code2obs(Obs.data[j].code[k],NULL),code)) break;
+            }
+            if (k>=NFREQ+NEXOBS) continue;*/
+
+            time=Obs.data[j].time;
+
+            /*if (TimeLabel==0) {
+                tow=time2gpst(time,&week);
+                sprintf(tstr,"%4d %9.1f ",week,tow);
+            }
+            else if (TimeLabel==1) {
+                time2str(time,tstr,1);
+            }
+            else if (TimeLabel==2) {
+                time2str(gpst2utc(time),tstr,1);
+            }
+            else {
+                time2str(timeadd(gpst2utc(time),9*3600.0),tstr,1);
+			}*/
+			time2str(time,tstr,1);
+            fprintf(fp,"%s %6s %8.1f %8.1f\n",tstr,sat,Az[j]*R2D,
+                    El[j]*R2D);
+        }
+    }
+
+    fclose(fp);
+
+	MessageBox(Handle,"高度角和方位角输出完成","提示",MB_OK);
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnAllAssessmentClick(TObject *Sender)
+{
+	//综合数据质量评价
+
+    if(rtkplotallassessDialog->ShowModal() != mrOk)
+		return;
+
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TrtkplotMainWindow::BtnSaveImageClick(TObject *Sender)
+{
+	char file[1024],*ext;
+
+    if(!SaveImageDialog->Execute() return;)
+
+}
+//---------------------------------------------------------------------------
+

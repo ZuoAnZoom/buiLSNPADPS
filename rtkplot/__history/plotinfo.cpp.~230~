@@ -1,0 +1,874 @@
+#include "rtklib.h"
+#include "rtkplotmain.h"
+
+#define YLIM_AGE    10.0            // ylimit of age of differential
+#define YLIM_RATIO  20.0            // ylimit of raito factor
+
+#define ATAN2(x,y)  ((x)*(x)+(y)*(y)>1E-12?atan2(x,y):0.0)
+
+// update size of plot ------------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateSize(void)
+{
+	//TSpeedButton *btn[]={BtnOn1,BtnOn2,BtnOn3};
+    TPoint p1(0,0),p2(Disp->Width,Disp->Height);
+    double xs,ys;
+    int i,n,h,tmargin,bmargin,rmargin,lmargin;
+
+    trace(3,"UpdateSize\n");
+
+    tmargin=5;                             // top margin
+    bmargin=(int)(Disp->Font->Size*1.5)+3; // bottom
+    rmargin=8;                             // right
+    lmargin=Disp->Font->Size*3+15;         // left
+
+    GraphT->SetPos(p1,p2);
+    GraphS->SetPos(p1,p2);
+    GraphS->GetScale(xs,ys);
+    xs=MAX(xs,ys);
+    GraphS->SetScale(xs,xs);
+    p1.x+=lmargin; p1.y+=tmargin;
+    p2.x-=rmargin; p2.y=p2.y-bmargin;
+    GraphR->SetPos(p1,p2);
+
+	bool btnon3[3] = {1,1,1};
+	switch(PlotType)
+	{
+		case PLOT_CNR: {btnon3[0]=1;btnon3[1]=0;btnon3[2]=0; break;}
+		case PLOT_MP: {btnon3[0]=0;btnon3[1]=1;btnon3[2]=0;break;}
+		case PLOT_Ele: {btnon3[0]=0;btnon3[1]=0;btnon3[2]=1;break;}
+    }
+
+	p1.y=tmargin; p2.y=p1.y;
+	for (i=n=0;i<3;i++)
+        if(btnon3[i])
+			n++;
+
+	for (i=0;i<3;i++) {
+        if(!(btnon3[i]))
+			continue;
+		h=(Disp->Height-tmargin-bmargin)/n;
+		p2.y+=h;
+		GraphG[i]->SetPos(p1,p2);
+		p1.y+=h;
+	}
+	p1.y=tmargin; p2.y=p1.y;
+	for (i=n=0;i<2;i++)
+		if(btnon3[i])
+			n++;
+	for (i=0;i<2;i++) {
+        if(!(btnon3[i]))
+			continue;
+		h=(Disp->Height-tmargin-bmargin)/n;
+		p2.y+=h;
+		GraphE[i]->SetPos(p1,p2);
+		p1.y+=h;
+	}
+}
+// update time-information for observation-data plot ------------------------
+void __fastcall TrtkplotMainWindow::UpdateTimeObs(void)
+{
+    AnsiString msgs1[]={" OBS=L1/2 "," L1 "," L2 "," L1/2/5 "," L1/5 ",""," L5 "};
+    AnsiString msgs2[]={" SNR=...45.","..40.","..35.","..30.","..25 ",""," <25 "};
+    AnsiString msgs3[]={" SYS=GPS ","GLO ","GAL ","QZS ","BDS ","SBS ",""};
+    AnsiString msgs4[]={" MP=..0.6","..0.3","..0.0..","-0.3..","-0.6..","",""};
+    AnsiString msg,msgs[8],s;
+    double azel[MAXOBS*2],dop[4]={0};
+    int i,ns=0,no=0,ind=ObsIndex;
+    char tstr[64];
+
+    trace(3,"UpdateTimeObs\n");
+
+	//if (BtnSol1->Down&&0<=ind&&ind<NObs) {
+    if(NObs>0 && 0<=ind && ind<NObs) {
+        for (i=IndexObs[ind];i<Obs.n&&i<IndexObs[ind+1];i++,no++) {
+            if (SatMask[Obs.data[i].sat-1]||!SatSel[Obs.data[i].sat-1]) continue;
+            if (El[i]<ElMask*D2R) continue;
+            if (ElMaskP&&El[i]<ElMaskData[(int)(Az[i]*R2D+0.5)]) continue;
+            azel[  ns*2]=Az[i];
+            azel[1+ns*2]=El[i];
+            ns++;
+        }
+    }
+    if (ns>=0) {
+        dops(ns,azel,ElMask*D2R,dop);
+
+        TimeStr(Obs.data[IndexObs[ind]].time,3,1,tstr);
+        msg.sprintf("[1]%s : N=%d ",tstr,no);
+
+        if (PlotType==PLOT_DOP) {
+			//msgs[0].sprintf("NSAT=%d",ns);
+			msgs[0].sprintf("卫星总数=%d",ns);
+            msgs[1].sprintf(" GDOP=%.1f",dop[0]);
+            msgs[2].sprintf(" PDOP=%.1f",dop[1]);
+            msgs[3].sprintf(" HDOP=%.1f",dop[2]);
+            msgs[4].sprintf(" VDOP=%.1f",dop[3]);
+		}
+		//else if (PlotType<=PLOT_SKY&&ObsType->ItemIndex==0) {
+		else if((PlotType==PLOT_VisSat||PlotType==PLOT_SkyCNR)&&ObsType->ItemIndex==0) {
+			//msg+=s.sprintf("NSAT=%d ",ns);
+			msg+=s.sprintf("卫星总数=%d",ns);
+			for (i=0;i<7;i++) msgs[i]=SimObs?msgs3[i]:msgs1[i];
+		}
+		//else if (PlotType==PLOT_MPS) {
+		else if(PlotType==PLOT_SkyMP) {
+			//msg+=s.sprintf("NSAT=%d ",ns);
+			msg+=s.sprintf("卫星总数=%d",ns);
+			for (i=0;i<7;i++) msgs[i]=msgs4[i];
+		}
+        else {
+            msg+=s.sprintf("NSAT=%d ",ns);
+            for (i=0;i<7;i++) msgs[i]=SimObs?msgs3[i]:msgs2[i];
+        }
+    }
+    ShowMsg(msg);
+    ShowLegend(msgs);
+}
+// update statistics-information for observation-data plot ------------------
+void __fastcall TrtkplotMainWindow::UpdateInfoObs(void)
+{
+    /*AnsiString msgs0[]={"  NSAT"," GDOP"," PDOP"," HDOP"," VDOP","",""};
+    AnsiString msgs1[]={" OBS=L1/2 "," L1 "," L2 "," L1/2/5 "," L1/5 ",""," L5 "};
+    AnsiString msgs2[]={" SNR=...45.","..40.","..35.","..30.","..25 ",""," <25 "};
+    AnsiString msgs3[]={" SYS=GPS ","GLO ","GAL ","QZS ","BDS ","SBS ",""};
+	AnsiString msgs4[]={" MP=..0.6","..0.3","..0.0..","-0.3..","-0.6..","",""};*/
+	AnsiString msgs0[]={"  NSAT"," GDOP"," PDOP"," HDOP"," VDOP","",""};
+	AnsiString msgs1[]={"  频点=L1/2 "," L1 "," L2 "," L1/2/5 "," L1/5 ",""," L5 "};
+	AnsiString msgs2[]={"  载噪比=...45.","..40.","..35.","..30.","..25 ",""," <25 "};
+	AnsiString msgs3[]={"  卫星=GPS ","GLO ","GAL ","QZS ","BDS ","SBS ",""};
+	AnsiString msgs4[]={"  多路径误差=..0.6","..0.3","..0.0..","-0.3..","-0.6..","",""};
+    AnsiString msg,msgs[8];
+    gtime_t ts={0},te={0},t,tp={0};
+    int i,n=0,ne=0;
+    char s1[64],s2[64];
+
+    trace(3,"UpdateInfoObs:\n");
+
+	//if (BtnSol1->Down) {
+	if(NObs>0) {
+        for (i=0;i<Obs.n;i++) {
+            t=Obs.data[i].time;
+            if (ts.time==0) ts=t; te=t;
+            if (tp.time==0||timediff(t,tp)>TTOL) ne++;
+            n++; tp=t;
+        }
+    }
+    if (n>0) {
+        TimeStr(ts,0,0,s1);
+        TimeStr(te,0,1,s2);
+        msg.sprintf("%s-%s : 历元数=%d 总记录数=%d",s1,s2+(TimeLabel?5:0),ne,n);
+
+        for (i=0;i<7;i++) {
+            if (PlotType==PLOT_DOP) {
+                msgs[i]=msgs0[i];
+            }
+			//else if (PlotType<=PLOT_SKY&&ObsType->ItemIndex==0) {
+			else if((PlotType==PLOT_VisSat&&ObsType->ItemIndex==0)||
+					(PlotType==PLOT_SkyCNR&&ObsType->ItemIndex==0)) {
+				msgs[i]=SimObs?msgs3[i]:msgs1[i];
+			}
+			//else if (PlotType==PLOT_MPS) {
+			else if(PlotType==PLOT_SkyMP) {
+				msgs[i]=msgs4[i];
+			}
+			else if(PlotType==PLOT_CNR || PlotType==PLOT_MP || PlotType==PLOT_CNREle || PlotType==PLOT_MPEle){
+            	msgs[i]="";
+			}
+            else {
+                msgs[i]=SimObs?msgs3[i]:msgs2[i];
+            }
+        }
+    }
+    ShowMsg(msg);
+    ShowLegend(msgs);
+}
+// update information on status-bar -----------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateInfo(void)
+{
+	//int showobs=(PLOT_OBS<=PlotType&&PlotType<=PLOT_DOP)||
+	//            PlotType==PLOT_SNR||PlotType==PLOT_SNRE||PlotType==PLOT_MPS;
+	int showobs = PLOT_VisSat <=PlotType && PlotType<=PLOT_MPEle;
+
+    trace(3,"UpdateInfo:\n");
+
+    if (BtnShowTrack->Down) {
+		if (showobs)
+			UpdateTimeObs();
+		//else UpdateTimeSol();
+    }
+    else {
+		if (showobs)
+			UpdateInfoObs();
+		//else UpdateInfoSol();
+    }
+}
+// update enable/disable of widgets -----------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateEnable(void)
+{
+    AnsiString s;
+    double range;
+	int i;
+	//int data=BtnSol1->Down||BtnSol2->Down||BtnSol12->Down;
+	int data = (NObs>0)?1:0;
+	//int plot=PLOT_SOLP<=PlotType&&PlotType<=PLOT_NSAT;
+	int plot = 0;
+    int sel=!BtnSol1->Down&&BtnSol2->Down?1:0;
+
+    trace(3,"UpdateEnable\n");
+
+	if(NObs<=0)
+		ObsType->Visible = true;
+	else{
+		ObsType->Visible = PlotType==PLOT_VisSat || PlotType==PLOT_SkyCNR;
+		ObsType2->Visible = (PlotType==PLOT_CNR || PlotType==PLOT_MP || PlotType==PLOT_Ele ||
+						PlotType==PLOT_CNREle || PlotType==PLOT_MPEle || PlotType == PLOT_SkyMP);
+		ObsType->Enabled=!SimObs;
+		ObsType2->Enabled = !SimObs;
+	}
+
+	DopType->Visible = PlotType==PLOT_DOP;
+
+	SatList->Visible = 1;
+	SatList->Enabled = 1;
+
+	BtnFitHoriz->Enabled = data&&PlotType!=PLOT_SkyCNR&&PlotType!=PLOT_CNREle&&PlotType!=PLOT_MPEle;
+	BtnFitVert->Enabled = data&&PlotType==PLOT_MP;
+	BtnShowTrack   ->Enabled=data;
+
+	//BtnShowSkyplot->Visible = PlotType==PLOT_SkyCNR||PlotType==PLOT_SkyMP;
+	BtnShowSkyplot->Visible= 1;
+	BtnShowSkyplot->Enabled = data&&(PlotType==PLOT_SkyCNR||PlotType==PLOT_SkyMP);
+	//BtnShowSkyplot->Down = data&&(PlotType==PLOT_SkyCNR||PlotType==PLOT_SkyMP);
+
+	BtnAnimate     ->Enabled=data&&BtnShowTrack->Down;
+
+    if (!BtnShowTrack->Down) {
+		BtnAnimate ->Down   =false;
+    }
+
+	TimeScroll     ->Enabled=data&&BtnShowTrack->Down;
+    Panel12        ->Visible=!ConnectState;
+}
+//---------------------------------------------------------------------------//---------------------------------------------------------------------------// update time-cursor -------------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateTime(void)
+{
+	gtime_t time;
+	sol_t *sol;
+    double tt;
+    int i,j,sel=!BtnSol1->Down&&BtnSol2->Down?1:0;
+
+    trace(3,"UpdateTime\n");
+
+    // time-cursor change on solution-plot
+	//if (PlotType<=PLOT_NSAT||PlotType<=PLOT_RES) {
+	if(false){
+        TimeScroll->Max=MAX(1,SolData[sel].n-1);
+        TimeScroll->Position=SolIndex[sel];
+        if (!(sol=getsol(SolData+sel,SolIndex[sel]))) return;
+        time=sol->time;
+    }
+    else if (NObs>0) { // time-cursor change on observation-data-plot
+        TimeScroll->Max=MAX(1,NObs-1);
+        TimeScroll->Position=ObsIndex;
+        time=Obs.data[IndexObs[ObsIndex]].time;
+    }
+	else
+		return;
+
+    // time-synchronization between solutions and observation-data
+    for (sel=0;sel<2;sel++) {
+       i=SolIndex[sel];
+       if (!(sol=getsol(SolData+sel,i))) continue;
+       tt=timediff(sol->time,time);
+       if (tt<-DTTOL) {
+           for (;i<SolData[sel].n;i++) {
+               if (!(sol=getsol(SolData+sel,i))) continue;
+               if (timediff(sol->time,time)>=-DTTOL) break;
+           }
+       }
+       else if (tt>DTTOL) {
+           for (;i>=0;i--) {
+               if (!(sol=getsol(SolData+sel,i))) continue;
+               if (timediff(sol->time,time)<=DTTOL) break;
+           }
+       }
+       SolIndex[sel]=MAX(0,MIN(SolData[sel].n-1,i));
+    }
+    i=ObsIndex;
+    if (i<=NObs-1) {
+        tt=timediff(Obs.data[IndexObs[i]].time,time);
+        if (tt<-DTTOL) {
+            for (;i<NObs;i++) {
+                if (timediff(Obs.data[IndexObs[i]].time,time)>=-DTTOL) break;
+            }
+        }
+        else if (tt>DTTOL) {
+            for (;i>=0;i--) {
+                if (timediff(Obs.data[IndexObs[i]].time,time)<=DTTOL) break;
+            }
+        }
+        ObsIndex=MAX(0,MIN(NObs-1,i));
+    }
+}
+// update observation type pull-down menu --------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateObsType(void)
+{
+    AnsiString s;
+    char *codes[MAXCODE+1],freqs[]="125678";
+    int i,j,n=0,cmask[MAXCODE+1]={0},fmask[6]={0};
+
+    trace(3,"UpdateObsType\n");
+
+    for (i=0;i<Obs.n;i++) for (j=0;j<NFREQ+NEXOBS;j++) {
+        cmask[Obs.data[i].code[j]]=1;
+    }
+    for (i=1;i<=MAXCODE;i++) {
+        if (!cmask[i]) continue;
+        codes[n++]=code2obs(i,&j);
+        fmask[j-1]=1;
+    }
+    ObsType ->Items->Clear();
+    ObsType2->Items->Clear();
+    ObsType ->Items->Add("ALL");
+
+    for (i=0;i<6;i++) {
+        if (!fmask[i]) continue;
+        ObsType ->Items->Add(s.sprintf("L%c",freqs[i]));
+        ObsType2->Items->Add(s.sprintf("L%c",freqs[i]));
+    }
+    for (i=0;i<n;i++) {
+        ObsType ->Items->Add(s.sprintf("L%s",codes[i]));
+        ObsType2->Items->Add(s.sprintf("L%s",codes[i]));
+    }
+    ObsType ->ItemIndex=0;
+    ObsType2->ItemIndex=0;
+}
+
+// fit time-range of plot ---------------------------------------------------
+void __fastcall TrtkplotMainWindow::FitTime(void)
+{
+    sol_t *sols,*sole;
+    double tl[2]={86400.0*7,0.0},tp[2],xl[2],yl[2],zl[2];
+    int sel=!BtnSol1->Down&&BtnSol2->Down?1:0;
+
+    trace(3,"FitTime\n");
+
+    sols=getsol(SolData+sel,0);
+    sole=getsol(SolData+sel,SolData[sel].n-1);
+    if (sols&&sole) {
+        tl[0]=MIN(tl[0],TimePos(sols->time));
+        tl[1]=MAX(tl[1],TimePos(sole->time));
+    }
+    if (Obs.n>0) {
+        tl[0]=MIN(tl[0],TimePos(Obs.data[0].time));
+        tl[1]=MAX(tl[1],TimePos(Obs.data[Obs.n-1].time));
+    }
+    if (TimeEna[0]) tl[0]=TimePos(TimeStart);
+    if (TimeEna[1]) tl[1]=TimePos(TimeEnd  );
+
+    if (tl[0]==tl[1]) {
+        tl[0]=tl[0]-DEFTSPAN/2.0;
+        tl[1]=tl[0]+DEFTSPAN/2.0;
+    }
+    else if (tl[0]>tl[1]) {
+        tl[0]=-DEFTSPAN/2.0;
+        tl[1]= DEFTSPAN/2.0;
+    }
+    GraphG[0]->GetLim(tp,xl);
+    GraphG[1]->GetLim(tp,yl);
+    GraphG[2]->GetLim(tp,zl);
+    GraphG[0]->SetLim(tl,xl);
+    GraphG[1]->SetLim(tl,yl);
+    GraphG[2]->SetLim(tl,zl);
+    GraphR   ->GetLim(tp,xl);
+    GraphR   ->SetLim(tl,xl);
+}
+
+// update plot-type pull-down menu ------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdatePlotType(void)
+{
+    int i;
+
+	trace(3,"UpdatePlotType\n");
+
+	PlotTypeS->Clear();
+	PlotTypeS->AddItem(PTypes[PLOT_VisSat],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_CNR],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_MP],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_SkyCNR],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_SkyMP],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_DOP],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_Ele],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_CNREle],NULL);
+	PlotTypeS->AddItem(PTypes[PLOT_MPEle],NULL);
+
+    /*if (SolData[0].n>0||SolData[1].n>0||
+		(NObs<=0&&SolStat[0].n<=0&&SolStat[1].n<=0)) {
+		PlotTypeS->AddItem(PTypes[PLOT_TRK ],NULL);
+		PlotTypeS->AddItem(PTypes[PLOT_SOLP],NULL);
+		PlotTypeS->AddItem(PTypes[PLOT_SOLV],NULL);
+		PlotTypeS->AddItem(PTypes[PLOT_SOLA],NULL);
+		PlotTypeS->AddItem(PTypes[PLOT_NSAT],NULL);
+	}
+	if (NObs>0) {
+        PlotTypeS->AddItem(PTypes[PLOT_OBS ],NULL);
+        PlotTypeS->AddItem(PTypes[PLOT_SKY ],NULL);
+        PlotTypeS->AddItem(PTypes[PLOT_DOP ],NULL);
+    }
+	if (SolStat[0].n>0||SolStat[1].n>0) {
+        PlotTypeS->AddItem(PTypes[PLOT_RES ],NULL);
+	}
+    if (NObs>0) {
+        PlotTypeS->AddItem(PTypes[PLOT_SNR ],NULL);
+        PlotTypeS->AddItem(PTypes[PLOT_SNRE],NULL);
+        PlotTypeS->AddItem(PTypes[PLOT_MPS ],NULL);
+    } */
+    for (i=0;i<PlotTypeS->Items->Count;i++) {
+        if(PlotType==-1) break;
+		if (PlotTypeS->Items->Strings[i]!=PTypes[PlotType]) continue;
+        PlotTypeS->ItemIndex=i;
+        return;
+    }
+    PlotTypeS->ItemIndex=0;
+}
+// fit x/y-range of plot ----------------------------------------------------
+void __fastcall TrtkplotMainWindow::FitRange(int all)
+{
+	TIMEPOS *pos,*pos1,*pos2;
+	sol_t *data;
+    double xs,ys,xp[2],tl[2],xl[]={1E8,-1E8},yl[2]={1E8,-1E8},zl[2]={1E8,-1E8};
+    double lat,lon,lats[2]={90,-90},lons[2]={180,-180},llh[3];
+	int i,w,h;
+	//int type=PlotType-PLOT_SOLP;
+    int type = PlotType -1;
+
+	trace(3,"FitRange: all=%d\n",all);
+
+	//this->BtnFixHoriz->Down = false;
+	//this->MenuFixHoriz->Checked = false;
+
+	if (BtnSol1->Down) {
+
+        pos=SolToPos(SolData,-1,QFlag->ItemIndex,type);
+
+        for (i=0;i<pos->n;i++) {
+            xl[0]=MIN(xl[0],pos->x[i]);
+            yl[0]=MIN(yl[0],pos->y[i]);
+            zl[0]=MIN(zl[0],pos->z[i]);
+            xl[1]=MAX(xl[1],pos->x[i]);
+            yl[1]=MAX(yl[1],pos->y[i]);
+            zl[1]=MAX(zl[1],pos->z[i]);
+        }
+        delete pos;
+    }
+    if (BtnSol2->Down) {
+
+        pos=SolToPos(SolData+1,-1,QFlag->ItemIndex,type);
+
+        for (i=0;i<pos->n;i++) {
+            xl[0]=MIN(xl[0],pos->x[i]);
+            yl[0]=MIN(yl[0],pos->y[i]);
+            zl[0]=MIN(zl[0],pos->z[i]);
+            xl[1]=MAX(xl[1],pos->x[i]);
+            yl[1]=MAX(yl[1],pos->y[i]);
+            zl[1]=MAX(zl[1],pos->z[i]);
+        }
+        delete pos;
+    }
+    if (BtnSol12->Down) {
+
+        pos1=SolToPos(SolData  ,-1,0,type);
+        pos2=SolToPos(SolData+1,-1,0,type);
+        pos=pos1->diff(pos2,QFlag->ItemIndex);
+
+        for (i=0;i<pos->n;i++) {
+            xl[0]=MIN(xl[0],pos->x[i]);
+            yl[0]=MIN(yl[0],pos->y[i]);
+            zl[0]=MIN(zl[0],pos->z[i]);
+            xl[1]=MAX(xl[1],pos->x[i]);
+            yl[1]=MAX(yl[1],pos->y[i]);
+            zl[1]=MAX(zl[1],pos->z[i]);
+        }
+        delete pos1;
+        delete pos2;
+        delete pos;
+    }
+    xl[0]-=0.05;
+    xl[1]+=0.05;
+    yl[0]-=0.05;
+    yl[1]+=0.05;
+    zl[0]-=0.05;
+	zl[1]+=0.05;
+
+	/*if (all||PlotType==PLOT_TRK) {
+		GraphT->SetLim(xl,yl);
+		GraphT->GetScale(xs,ys);
+		GraphT->SetScale(MAX(xs,ys),MAX(xs,ys));
+	}
+	if (all||PlotType<=PLOT_SOLA||PlotType==PLOT_RES) {
+		GraphG[0]->GetLim(tl,xp);
+		GraphG[0]->SetLim(tl,xl);
+		GraphG[1]->SetLim(tl,yl);
+		GraphG[2]->SetLim(tl,zl);
+	}*/
+    if (all) {
+        if (BtnSol1->Down) {
+            for (i=0;data=getsol(SolData,i);i++) {
+                ecef2pos(data->rr,llh);
+                lats[0]=MIN(lats[0],llh[0]*R2D);
+                lons[0]=MIN(lons[0],llh[1]*R2D);
+                lats[1]=MAX(lats[1],llh[0]*R2D);
+                lons[1]=MAX(lons[1],llh[1]*R2D);
+            }
+        }
+        if (BtnSol2->Down) {
+            for (i=0;data=getsol(SolData+1,i);i++) {
+                ecef2pos(data->rr,llh);
+                lats[0]=MIN(lats[0],llh[0]*R2D);
+                lons[0]=MIN(lons[0],llh[1]*R2D);
+                lats[1]=MAX(lats[1],llh[0]*R2D);
+                lons[1]=MAX(lons[1],llh[1]*R2D);
+            }
+        }
+        if (lats[0]<=lats[1]&&lons[0]<=lons[1]) {
+            lat=(lats[0]+lats[1])/2.0;
+            lon=(lons[0]+lons[1])/2.0;
+//            GoogleEarthView->SetView(lat,lon,0.0,0.0);
+        }
+    }
+}
+// set x/y-range of plot ----------------------------------------------------
+void __fastcall TrtkplotMainWindow::SetRange(int all, double range)
+{
+    double xl[]={-range,range};
+    double yl[]={-range,range};
+    double zl[]={-range,range};
+    double xs,ys,tl[2],xp[2],pos[3];
+    int w,h;
+
+    trace(3,"SetRange: all=%d range=%.3f\n",all,range);
+
+	//if (all||PlotType==PLOT_TRK) {
+	if(all||false){
+        GraphT->SetLim(xl,yl);
+        GraphT->GetScale(xs,ys);
+        GraphT->SetScale(MAX(xs,ys),MAX(xs,ys));
+#if 1
+        if (norm(OPos,3)>0.0) {
+            ecef2pos(OPos,pos);
+			//GoogleEarthView->SetView(pos[0]*R2D,pos[1]*R2D,0.0,0.0);
+            //GoogleMapView->SetView(pos[0]*R2D,pos[1]*R2D,13);
+        }
+#endif
+    }
+	//if (PLOT_SOLP<=PlotType&&PlotType<=PLOT_SOLA) {
+	if(false){
+        GraphG[0]->GetLim(tl,xp);
+        GraphG[0]->SetLim(tl,xl);
+        GraphG[1]->SetLim(tl,yl);
+        GraphG[2]->SetLim(tl,zl);
+    }
+	//else if (PlotType==PLOT_NSAT) {
+	else if(false) {
+        GraphG[0]->GetLim(tl,xp);
+        xl[0]=yl[0]=zl[0]=0.0;
+        xl[1]=MaxDop;
+        yl[1]=YLIM_AGE;
+        zl[1]=YLIM_RATIO;
+        GraphG[0]->SetLim(tl,xl);
+        GraphG[1]->SetLim(tl,yl);
+        GraphG[2]->SetLim(tl,zl);
+    }
+	//else if (PlotType<PLOT_SNR) {
+	else if(PlotType==PLOT_SkyCNR || PlotType==PLOT_DOP) {
+        GraphG[0]->GetLim(tl,xp);
+        xl[0]=-10.0; xl[1]=10.0;
+        yl[0]= -0.1; yl[1]= 0.1;
+        zl[0]=  0.0; zl[1]=90.0;
+        GraphG[0]->SetLim(tl,xl);
+        GraphG[1]->SetLim(tl,yl);
+        GraphG[2]->SetLim(tl,zl);
+    }
+    else {
+        GraphG[0]->GetLim(tl,xp);
+        xl[0]=10.0; xl[1]= 60.0;
+        yl[0]=-MaxMP; yl[1]=MaxMP;
+        zl[0]= 0.0; zl[1]= 90.0;
+        GraphG[0]->SetLim(tl,xl);
+        GraphG[1]->SetLim(tl,yl);
+        GraphG[2]->SetLim(tl,zl);
+    }
+}
+// update plot-type with fit-range ------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateType(int type)
+{
+    trace(3,"UpdateType: type=%d\n",type);
+
+    PlotType=type;
+
+	/*if (AutoScale&&PlotType<=PLOT_SOLA&&(SolData[0].n>0||SolData[1].n>0)) {
+		FitRange(0);
+	}
+	else {
+		SetRange(0,YRange);
+	}*/
+	SetRange(0,YRange);
+
+    UpdatePlotType();
+}
+// update satellite-list pull-down menu -------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateSatList(void)
+{
+    int i,j,sys,sysp=0,sat,smask[MAXSAT]={0};
+    char s[8];
+
+    trace(3,"UpdateSatList\n");
+
+    for (i=0;i<2;i++) for (j=0;j<SolStat[i].n;j++) {
+        sat=SolStat[i].data[j].sat;
+        if (1<=sat&&sat<=MAXSAT) smask[sat-1]=1;
+    }
+    for (j=0;j<Obs.n;j++) {
+        sat=Obs.data[j].sat;
+        if (1<=sat&&sat<=MAXSAT) smask[sat-1]=1;
+    }
+    SatList->Items->Clear();
+    SatList->Items->Add("ALL");
+
+    for (sat=1;sat<=MAXSAT;sat++) {
+        if (SatMask[sat-1]||!smask[sat-1]) continue;
+        if ((sys=satsys(sat,NULL))==sysp) continue;
+        switch ((sysp=sys)) {
+            case SYS_GPS: strcpy(s,"G"); break;
+            case SYS_GLO: strcpy(s,"R"); break;
+            case SYS_GAL: strcpy(s,"E"); break;
+            case SYS_QZS: strcpy(s,"J"); break;
+            case SYS_CMP: strcpy(s,"C"); break;
+            case SYS_SBS: strcpy(s,"S"); break;
+        }
+        SatList->Items->Add(s);
+    }
+    for (sat=1;sat<=MAXSAT;sat++) {
+        if (SatMask[sat-1]||!smask[sat-1]) continue;
+        satno2id(sat,s);
+        SatList->Items->Add(s);
+    }
+    SatList->ItemIndex=0;
+
+    UpdateSatSel();
+}
+// update satellite select ---------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateSatSel(void)
+{
+    AnsiString SatListText=SatList->Text;
+    char id[16];
+    int i,sys=0;
+
+    if      (SatListText=="G") sys=SYS_GPS;
+    else if (SatListText=="R") sys=SYS_GLO;
+    else if (SatListText=="E") sys=SYS_GAL;
+    else if (SatListText=="J") sys=SYS_QZS;
+    else if (SatListText=="C") sys=SYS_CMP;
+    else if (SatListText=="S") sys=SYS_SBS;
+    for (i=0;i<MAXSAT;i++) {
+        satno2id(i+1,id);
+        SatSel[i]=SatListText=="ALL"||SatListText==id||satsys(i+1,NULL)==sys;
+    }
+}
+// update colors on plot ----------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateColor(void)
+{
+    int i;
+
+    trace(3,"UpdateColor\n");
+
+    for (i=0;i<3;i++) {
+        GraphT   ->Color[i]=CColor[i];
+        GraphR   ->Color[i]=CColor[i];
+        GraphS   ->Color[i]=CColor[i];
+        GraphG[0]->Color[i]=CColor[i];
+        GraphG[1]->Color[i]=CColor[i];
+        GraphG[2]->Color[i]=CColor[i];
+    }
+    Disp->Font->Assign(Font);
+}
+// update satellite mask ----------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateSatMask(void)
+{
+    int sat,prn;
+    char buff[256],*p;
+
+    trace(3,"UpdateSatMask\n");
+
+    for (sat=1;sat<=MAXSAT;sat++) SatMask[sat-1]=0;
+    for (sat=1;sat<=MAXSAT;sat++) {
+        if (!(satsys(sat,&prn)&NavSys)) SatMask[sat-1]=1;
+    }
+    if (ExSats!="") {
+        strcpy(buff,ExSats.c_str());
+
+        for (p=strtok(buff," ");p;p=strtok(NULL," ")) {
+            if (*p=='+'&&(sat=satid2no(p+1))) SatMask[sat-1]=0; // included
+            else if ((sat=satid2no(p)))       SatMask[sat-1]=1; // excluded
+        }
+    }
+}
+// update origin of plot ----------------------------------------------------
+void __fastcall TrtkplotMainWindow::UpdateOrigin(void)
+{
+    gtime_t time={0};
+    sol_t *sol;
+    double opos[3]={0},pos[3],ovel[3]={0};
+    int i,j,n=0,sel=!BtnSol1->Down&&BtnSol2->Down?1:0;
+    char file[1024],sta[16]="",*p;
+
+    trace(3,"UpdateOrigin\n");
+
+    if (Origin==ORG_STARTPOS) {
+        if (!(sol=getsol(SolData,0))||sol->type!=0) return;
+        for (i=0;i<3;i++) opos[i]=sol->rr[i];
+    }
+    else if (Origin==ORG_ENDPOS) {
+        if (!(sol=getsol(SolData,SolData[0].n-1))||sol->type!=0) return;
+        for (i=0;i<3;i++) opos[i]=sol->rr[i];
+    }
+    else if (Origin==ORG_AVEPOS) {
+        for (i=0;sol=getsol(SolData,i);i++) {
+            if (sol->type!=0) continue;
+            for (j=0;j<3;j++) opos[j]+=sol->rr[j];
+            n++;
+        }
+        if (n>0) for (i=0;i<3;i++) opos[i]/=n;
+    }
+    else if (Origin==ORG_FITPOS) {
+        if (!FitPos(&time,opos,ovel)) return;
+    }
+    else if (Origin==ORG_REFPOS) {
+        if (norm(SolData[0].rb,3)>0.0) {
+            for (i=0;i<3;i++) opos[i]=SolData[0].rb[i];
+        }
+        else {
+            if (!(sol=getsol(SolData,0))||sol->type!=0) return;
+            for (i=0;i<3;i++) opos[i]=sol->rr[i];
+        }
+    }
+    else if (Origin==ORG_LLHPOS) {
+        pos2ecef(OOPos,opos);
+    }
+    else if (Origin==ORG_AUTOPOS) {
+        if (SolFiles[sel]->Count>0) {
+
+            strcpy(file,U2A(SolFiles[sel]->Strings[0]).c_str());
+
+            if ((p=strrchr(file,'\\'))) strncpy(sta,p+1,4);
+            else strncpy(sta,file,4);
+            for (p=sta;*p;p++) *p=(char)toupper(*p);
+
+            //strcpy(file,U2A(RefDialog->StaPosFile).c_str());
+
+            //ReadStaPos(file,sta,opos);
+        }
+    }
+    else if (Origin-ORG_PNTPOS<MAXWAYPNT) {
+        for (i=0;i<3;i++) opos[i]=PntPos[Origin-ORG_PNTPOS][i];
+    }
+    if (norm(opos,3)<=0.0) {
+        // default start position
+        if (!(sol=getsol(SolData,0))||sol->type!=0) return;
+        for (i=0;i<3;i++) opos[i]=sol->rr[i];
+    }
+    OEpoch=time;
+    for (i=0;i<3;i++) {
+        OPos[i]=opos[i];
+        OVel[i]=ovel[i];
+    }
+    ecef2pos(OPos,pos);
+	//GoogleEarthView->SetView(pos[0]*R2D,pos[1]*R2D,0.0,0.0);
+    //GoogleMapView->SetView(pos[0]*R2D,pos[1]*R2D,13);
+}
+// linear-fitting of positions ----------------------------------------------
+int __fastcall TrtkplotMainWindow::FitPos(gtime_t *time, double *opos, double *ovel)
+{
+    sol_t *sol;
+    int i,j;
+    double t,x[2],Ay[3][2]={{0}},AA[3][4]={{0}};
+
+    trace(3,"FitPos\n");
+
+    if (SolData[0].n<=0) return 0;
+
+    for (i=0;sol=getsol(SolData,i);i++) {
+        if (sol->type!=0) continue;
+        if (time->time==0) *time=sol->time;
+        t=timediff(sol->time,*time);
+
+        for (j=0;j<3;j++) {
+            Ay[j][0]+=sol->rr[j];
+            Ay[j][1]+=sol->rr[j]*t;
+            AA[j][0]+=1.0;
+            AA[j][1]+=t;
+            AA[j][2]+=t;
+            AA[j][3]+=t*t;
+        }
+    }
+    for (i=0;i<3;i++) {
+        if (solve("N",AA[i],Ay[i],2,1,x)) return 0;
+        opos[i]=x[0];
+        ovel[i]=x[1];
+    }
+    return 1;
+}
+
+// update information for current-cursor position ---------------------------
+void __fastcall TrtkplotMainWindow::UpdatePoint(int x, int y)
+{
+    gtime_t time;
+    TPoint p(x,y);
+    double enu[3]={0},rr[3],pos[3],xx,yy,r,xl[2],yl[2],q[2],az,el,snr;
+    int i;
+    char tstr[64];
+    AnsiString msg;
+
+    trace(4,"UpdatePoint: x=%d y=%d\n",x,y);
+
+	//if (PlotType==PLOT_TRK) { // track-plot
+	if(NObs<=0) {
+		if (norm(OPos,3)>0.0) {
+            GraphT->ToPos(p,enu[0],enu[1]);
+            ecef2pos(OPos,pos);
+            enu2ecef(pos,enu,rr);
+            for (i=0;i<3;i++) rr[i]+=OPos[i];
+            ecef2pos(rr,pos);
+            //msg=LatLonStr(pos,8);
+        }
+	}
+	//else if (PlotType==PLOT_SKY||PlotType==PLOT_MPS) { // sky-plot
+	else if(PlotType==PLOT_SkyCNR || PlotType==PLOT_SkyMP) {
+
+        GraphS->GetLim(xl,yl);
+        GraphS->ToPos(p,q[0],q[1]);
+        r=(xl[1]-xl[0]<yl[1]-yl[0]?xl[1]-xl[0]:yl[1]-yl[0])*0.45;
+
+        if ((el=90.0-90.0*norm(q,2)/r)>0.0) {
+            az=el>=90.0?0.0:ATAN2(q[0],q[1])*R2D;
+            if (az<0.0) az+=360.0;
+			//msg.sprintf("AZ=%5.1f" CHARDEG " EL=%4.1f" CHARDEG,az,el);
+			msg.sprintf("方位角=%5.1f" CHARDEG "  高度角=%4.1f" CHARDEG,az,el);
+        }
+    }
+	//else if (PlotType==PLOT_SNRE) { // snr-el-plot
+    else if(PlotType == PLOT_CNREle || PlotType==PLOT_MPEle) {
+        GraphE[0]->ToPos(p,q[0],q[1]);
+		//msg.sprintf("EL=%4.1f " CHARDEG,q[0]);
+		msg.sprintf("高度角=%4.1f " CHARDEG,q[0]);
+	}
+    else {
+        GraphG[0]->ToPos(p,xx,yy);
+        time=gpst2time(Week,xx);
+        if      (TimeLabel==2) time=utc2gpst(time); // UTC
+        else if (TimeLabel==3) time=timeadd(gpst2utc(time),-9*3600.0); // JST
+        TimeStr(time,0,1,tstr);
+        msg=tstr;
+    }
+    Panel22->Visible=true;
+    Message2->Caption=A2U(msg);
+}

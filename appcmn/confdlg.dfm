@@ -1,0 +1,67 @@
+object ConfDialog: TConfDialog
+  Left = 0
+  Top = 0
+  BorderStyle = bsDialog
+  Caption = #25552#31034
+  ClientHeight = 87
+  ClientWidth = 315
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poMainFormCenter
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Label1: TLabel
+    Left = 4
+    Top = 8
+    Width = 305
+    Height = 13
+    Alignment = taCenter
+    AutoSize = False
+    Caption = #25991#20214#24050#23384#22312#65292#30830#23450#37325#20889#65311
+  end
+  object Label2: TLabel
+    Left = 4
+    Top = 24
+    Width = 305
+    Height = 37
+    Alignment = taCenter
+    AutoSize = False
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clGray
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ParentFont = False
+    WordWrap = True
+  end
+  object BtnOverwrite: TButton
+    Left = 82
+    Top = 65
+    Width = 75
+    Height = 21
+    Caption = #30830#23450
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clBlack
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    ModalResult = 1
+    ParentFont = False
+    TabOrder = 0
+  end
+  object BtnCancel: TButton
+    Left = 158
+    Top = 65
+    Width = 75
+    Height = 21
+    Caption = #21462#28040
+    Default = True
+    ModalResult = 2
+    TabOrder = 1
+  end
+end

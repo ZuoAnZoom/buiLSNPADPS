@@ -1,0 +1,70 @@
+object TextViewer: TTextViewer
+  Left = 0
+  Top = 0
+  Caption = #25991#26412#26597#30475
+  ClientHeight = 415
+  ClientWidth = 624
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnClose = FormClose
+  OnResize = FormResize
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Text: TRichEdit
+    Left = 0
+    Top = 23
+    Width = 624
+    Height = 392
+    Align = alClient
+    BevelInner = bvNone
+    BevelOuter = bvNone
+    BorderStyle = bsNone
+    Font.Charset = GB2312_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Tahoma'
+    Font.Style = []
+    HideSelection = False
+    Lines.Strings = (
+      #35813#25991#20214#19981#23384#22312)
+    ParentFont = False
+    PlainText = True
+    ScrollBars = ssBoth
+    TabOrder = 1
+    WordWrap = False
+  end
+  object Panel1: TPanel
+    Left = 0
+    Top = 0
+    Width = 624
+    Height = 23
+    Align = alTop
+    TabOrder = 0
+    object BtnFind: TButton
+      Left = 558
+      Top = 1
+      Width = 65
+      Height = 21
+      Align = alRight
+      Caption = #26597#25214
+      TabOrder = 0
+      OnClick = BtnFindClick
+      ExplicitLeft = 552
+    end
+    object FindStr: TEdit
+      Left = 1
+      Top = 1
+      Width = 551
+      Height = 21
+      Align = alLeft
+      TabOrder = 1
+      OnKeyPress = FindStrKeyPress
+    end
+  end
+end

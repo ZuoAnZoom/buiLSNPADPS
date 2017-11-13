@@ -1,0 +1,120 @@
+object TcpOptDialog: TTcpOptDialog
+  Left = 0
+  Top = 0
+  BorderIcons = [biSystemMenu]
+  BorderStyle = bsDialog
+  Caption = 'Ntrip'#23458#25143#31471#37197#32622
+  ClientHeight = 129
+  ClientWidth = 318
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poMainFormCenter
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+  object LabelMntPnt: TLabel
+    Left = 8
+    Top = 42
+    Width = 48
+    Height = 13
+    Caption = #25346#36733#31449#28857
+  end
+  object LabelUser: TLabel
+    Left = 110
+    Top = 42
+    Width = 36
+    Height = 13
+    Caption = #29992#25143#21517
+  end
+  object LabelPasswd: TLabel
+    Left = 212
+    Top = 42
+    Width = 24
+    Height = 13
+    Caption = #23494#30721
+  end
+  object LabelPort: TLabel
+    Left = 212
+    Top = 4
+    Width = 24
+    Height = 13
+    Caption = #31471#21475
+  end
+  object LabelAddr: TLabel
+    Left = 8
+    Top = 4
+    Width = 72
+    Height = 13
+    Caption = #22788#29702#20013#24515#20027#26426
+  end
+  object BtnCancel: TButton
+    Left = 171
+    Top = 96
+    Width = 87
+    Height = 23
+    Caption = #21462#28040
+    ModalResult = 2
+    TabOrder = 0
+  end
+  object BtnOk: TButton
+    Left = 72
+    Top = 96
+    Width = 87
+    Height = 23
+    Caption = #30830#23450
+    ModalResult = 1
+    TabOrder = 1
+    OnClick = BtnOkClick
+  end
+  object MntPnt: TComboBox
+    Left = 6
+    Top = 56
+    Width = 101
+    Height = 21
+    AutoComplete = False
+    DropDownCount = 16
+    ItemIndex = 0
+    TabOrder = 2
+    Items.Strings = (
+      'SHA1')
+  end
+  object User: TEdit
+    Left = 108
+    Top = 56
+    Width = 101
+    Height = 21
+    TabOrder = 3
+  end
+  object Passwd: TEdit
+    Left = 210
+    Top = 56
+    Width = 101
+    Height = 21
+    PasswordChar = '*'
+    TabOrder = 4
+  end
+  object Port: TEdit
+    Left = 210
+    Top = 18
+    Width = 101
+    Height = 21
+    TabOrder = 5
+  end
+  object Addr: TComboBox
+    Left = 6
+    Top = 18
+    Width = 203
+    Height = 21
+    AutoComplete = False
+    DropDownCount = 16
+    ItemIndex = 0
+    TabOrder = 6
+    Items.Strings = (
+      '10.11.5.12')
+  end
+end

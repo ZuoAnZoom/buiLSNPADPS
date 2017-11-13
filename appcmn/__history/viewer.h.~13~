@@ -1,0 +1,39 @@
+//---------------------------------------------------------------------------
+
+#ifndef viewerH
+#define viewerH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.ComCtrls.hpp>
+#include <Vcl.ExtCtrls.hpp>
+//---------------------------------------------------------------------------
+class TTextViewer : public TForm
+{
+__published:	// IDE-managed Components
+	TRichEdit *Text;
+	TPanel *Panel1;
+	TButton *BtnFind;
+	TEdit *FindStr;
+	void __fastcall FormShow(TObject *Sender);
+	void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+	void __fastcall BtnFindClick(TObject *Sender);
+
+private:	// User declarations
+	AnsiString File;
+	wchar_t *TextStr;
+
+public:		// User declarations
+	int Option;
+	static TColor Color1,Color2;
+	static TFont *FontD;
+
+	__fastcall TTextViewer(TComponent* Owner);
+
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TTextViewer *TextViewer;
+//---------------------------------------------------------------------------
+#endif

@@ -1,0 +1,77 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Align = alClient
+  BorderStyle = bsNone
+  Caption = 'Form1'
+  ClientHeight = 401
+  ClientWidth = 701
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Panel1: TPanel
+    Left = 0
+    Top = 382
+    Width = 701
+    Height = 19
+    Align = alBottom
+    TabOrder = 0
+    ExplicitLeft = -93
+    ExplicitWidth = 794
+  end
+  object Panel2: TPanel
+    Left = 0
+    Top = 0
+    Width = 701
+    Height = 384
+    Align = alTop
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    BevelOuter = bvNone
+    TabOrder = 1
+    ExplicitLeft = -93
+    ExplicitWidth = 794
+    object Panel21: TPanel
+      Left = 0
+      Top = 0
+      Width = 329
+      Height = 384
+      Align = alLeft
+      BevelOuter = bvNone
+      TabOrder = 0
+      object Panel211: TPanel
+        Left = 0
+        Top = 0
+        Width = 329
+        Height = 126
+        Align = alTop
+        BevelOuter = bvNone
+        TabOrder = 0
+      end
+      object Panel212: TPanel
+        Left = 0
+        Top = 126
+        Width = 329
+        Height = 254
+        Align = alTop
+        BevelOuter = bvNone
+        TabOrder = 1
+      end
+    end
+    object Panel22: TPanel
+      Left = 238
+      Top = 0
+      Width = 463
+      Height = 384
+      Align = alRight
+      BevelOuter = bvNone
+      TabOrder = 1
+      ExplicitLeft = 331
+    end
+  end
+end

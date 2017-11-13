@@ -1,0 +1,444 @@
+//---------------------------------------------------------------------------
+
+#ifndef rtkplotmainH
+#define rtkplotmainH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.ExtCtrls.hpp>
+#include <Vcl.Dialogs.hpp>
+#include <Vcl.Buttons.hpp>
+#include <Vcl.Menus.hpp>
+#include <jpeg.hpp>
+#include <Vcl.ExtDlgs.hpp>
+#include <Vcl.OleCtrls.hpp>
+
+#include <ComObj.hpp>  //ole office-word
+
+#include "rtklib.h"
+#include "graph.h"
+
+#define MAXNFILE    256                 // max number of solution files
+#define MAXSTRBUFF  1024                // max length of stream buffer
+#define MAXWAYPNT   10                  // max number of waypoints
+#define MAXMAPPATH  4096                // max number of map path
+
+#define PRGNAME     "LSNPADPS"           // program name
+
+//#define CHARDEG     "\302\260"          // character code of degree (UTF-8)
+#define CHARDEG		"°"
+#define CHARUP2     "\302\262"          // character code of ^2     (UTF-8)
+
+#define DEFTSPAN    600.0               // default time span (s)
+#define INTARROW    60.0                // direction arrow interval (s)
+#define MAXTDIFF    60.0                // max differential time (s)
+#define DOPLIM      30.0                // dop view limit
+#define TTOL        DTTOL               // time-differnce tolerance (s)
+#define TBRK        300.0               // time to recognize break (s)
+#define THRESLIP    0.1                 // slip threshold of LG-jump (m)
+#define SIZE_COMP   45                  // compass size (pixels)
+#define SIZE_VELC   45                  // velocity circle size (pixels)
+#define CLORANGE    (TColor)0x00AAFF
+#define MIN_RANGE_GE 10.0               // min range for GE view
+
+/*#define PLOT_TRK    0                   // plot-type: track-plot
+#define PLOT_SOLP   1                   // plot-type: position-plot
+#define PLOT_SOLV   2                   // plot-type: velocity-plot
+#define PLOT_SOLA   3                   // plot-type: accel-plot
+#define PLOT_NSAT   4                   // plot-type: number-of-satellite-plot
+#define PLOT_RES    5                   // plot-type: residual-plot
+#define PLOT_OBS    6                   // plot-type: observation-data-plot
+#define PLOT_SKY    7                   // plot-type: sky-plot
+#define PLOT_DOP    8                   // plot-type: dop-plot
+#define PLOT_SNR    9                   // plot-type: snr/mp-plot
+#define PLOT_SNRE   10                  // plot-type: snr/mp-el-plot
+#define PLOT_MPS    11                  // plot-type: mp-skyplot */
+
+#define PLOT_VisSat 0   //plot-type: visible satellite
+#define PLOT_CNR	1	//plot-type: CNR
+#define PLOT_MP		2	//plot-type: MP
+#define PLOT_SkyCNR	3	//plot-type: sky-map CNR
+#define PLOT_SkyMP	4	//plot-type: sky-map MP
+#define PLOT_DOP	5 	//plot-type: DOP values
+#define PLOT_Ele	6	//plot-type: elevation
+#define PLOT_CNREle 7	//plot-type: CNR-Elevation
+#define PLOT_MPEle	8	//plot-type: MP-Elevation
+
+#define ORG_STARTPOS 0                  // plot-origin: start position
+#define ORG_ENDPOS  1                   // plot-origin: end position
+#define ORG_AVEPOS  2                   // plot-origin: average position
+#define ORG_FITPOS  3                   // plot-origin: linear-fit position
+#define ORG_REFPOS  4                   // plot-origin: reference position
+#define ORG_LLHPOS  5                   // plot-origin: lat/lon/hgt position
+#define ORG_AUTOPOS 6                   // plot-origin: auto-input position
+#define ORG_PNTPOS  7                   // plot-origin: way-point position
+
+#define TRACEFILE   "rtkplot.trace"     // trace file
+#define QCTMPFILE   "rtkplot_qc.temp"   // tempolary file for qc
+#define QCERRFILE   "rtkplot_qc.err"    // error file for qc
+
+#define SQR(x)      ((x)*(x))
+#define SQRT(x)     ((x)<0.0?0.0:sqrt(x))
+#define MAX(x,y)    ((x)>(y)?(x):(y))
+#define MIN(x,y)    ((x)<(y)?(x):(y))
+
+extern const char *PTypes[];
+
+//time-position calss
+class TIMEPOS
+{
+private:
+	int nmax_;
+public:
+	int n;
+	gtime_t *t;
+	double *x,*y,*z,*xs,*ys,*zs,*xys;
+	int *q;
+	TIMEPOS(int nmax,int sflg);
+	~TIMEPOS();
+	TIMEPOS *tdiff(void);
+	TIMEPOS *diff(const TIMEPOS *pos2,int qflag);
+};
+
+//---------------------------------------------------------------------------
+class TrtkplotMainWindow : public TForm
+{
+__published:	// IDE-managed Components
+	TPanel *Panel1;
+	TPanel *Panel2;
+	TPaintBox *Disp;
+	TPanel *Panel22;
+	TPanel *Panel21;
+	TLabel *Message1;
+	TLabel *QL1;
+	TLabel *QL2;
+	TLabel *QL3;
+	TLabel *QL4;
+	TLabel *QL5;
+	TLabel *QL6;
+	TLabel *Message2;
+	TPanel *Panel11;
+	TSpeedButton *BtnClear;
+	TSpeedButton *BtnOptions;
+	TPanel *Panel12;
+	TSpeedButton *BtnAnimate;
+	TScrollBar *TimeScroll;
+	TPanel *Panel10;
+	TSpeedButton *BtnFitHoriz;
+	TSpeedButton *BtnFitVert;
+	TSpeedButton *BtnShowSkyplot;
+	TSpeedButton *BtnShowTrack;
+	TComboBox *DopType;
+	TComboBox *FrqType;
+	TComboBox *ObsType;
+	TComboBox *PlotTypeS;
+	TComboBox *ObsType2;
+	TComboBox *SatList;
+	TLabel *QL7;
+	TSpeedButton *BtnOpenfile;
+	TOpenDialog *OpenObsDialog;
+	TSpeedButton *BtnSol1;
+	TSpeedButton *BtnSol12;
+	TSpeedButton *BtnSol2;
+	TComboBox *QFlag;
+	TTimer *Timer;
+	TSpeedButton *BtnSummary;
+	TSpeedButton *BtnDataIntegrityRate;
+	TSpeedButton *BtnObservationsPerSlip;
+	TSpeedButton *BtnMP;
+	TSpeedButton *BtnCNR;
+	TSpeedButton *BtnPn;
+	TSpeedButton *BtnCn;
+	TSpeedButton *BtnIon;
+	TSaveDialog *SaveDialog;
+	TSpeedButton *BtnDop;
+	TSpeedButton *BtnEleAz;
+	TSpeedButton *BtnAllAssessment;
+	TSaveDialog *SaveDialogOffice;
+	void __fastcall FormCreate(TObject *Sender);
+	void __fastcall BtnOpenfileClick(TObject *Sender);
+	void __fastcall DispPaint(TObject *Sender);
+	void __fastcall FormShow(TObject *Sender);
+	void __fastcall FormActivate(TObject *Sender);
+	void __fastcall FormResize(TObject *Sender);
+	void __fastcall FormMouseWheel(TObject *Sender, TShiftState Shift, int WheelDelta,
+          TPoint &MousePos, bool &Handled);
+	void __fastcall DispMouseDown(TObject *Sender, TMouseButton Button, TShiftState Shift,
+          int X, int Y);
+	void __fastcall DispMouseLeave(TObject *Sender);
+	void __fastcall DispMouseMove(TObject *Sender, TShiftState Shift, int X, int Y);
+	void __fastcall DispMouseUp(TObject *Sender, TMouseButton Button, TShiftState Shift,
+          int X, int Y);
+	void __fastcall DopTypeChange(TObject *Sender);
+	void __fastcall ObsTypeChange(TObject *Sender);
+	void __fastcall PlotTypeSChange(TObject *Sender);
+	void __fastcall SatListChange(TObject *Sender);
+	void __fastcall BtnFitHorizClick(TObject *Sender);
+	void __fastcall BtnClearClick(TObject *Sender);
+	void __fastcall BtnAnimateClick(TObject *Sender);
+	void __fastcall BtnShowTrackClick(TObject *Sender);
+	void __fastcall TimeScrollChange(TObject *Sender);
+	void __fastcall TimerTimer(TObject *Sender);
+	void __fastcall BtnOptionsClick(TObject *Sender);
+	void __fastcall BtnFitVertClick(TObject *Sender);
+	void __fastcall BtnShowSkyplotClick(TObject *Sender);
+	void __fastcall BtnSummaryClick(TObject *Sender);
+	void __fastcall BtnDataIntegrityRateClick(TObject *Sender);
+	void __fastcall BtnMPClick(TObject *Sender);
+	void __fastcall BtnCNRClick(TObject *Sender);
+	void __fastcall BtnCnClick(TObject *Sender);
+	void __fastcall BtnPnClick(TObject *Sender);
+	void __fastcall BtnObservationsPerSlipClick(TObject *Sender);
+	void __fastcall BtnIonClick(TObject *Sender);
+	void __fastcall BtnDopClick(TObject *Sender);
+	void __fastcall BtnEleAzClick(TObject *Sender);
+	void __fastcall BtnAllAssessmentClick(TObject *Sender);
+
+
+private:	// User declarations
+    Graphics::TBitmap *Buff;
+    Graphics::TBitmap *MapImage;
+    Graphics::TBitmap *SkyImageI;
+    Graphics::TBitmap *SkyImageR;
+	TGraph *GraphT;
+	TGraph *GraphG[3];
+	TGraph *GraphR;
+	TGraph *GraphS;
+	TGraph *GraphE[2];
+    TStrings *OpenFiles;
+    TStrings *SolFiles[2];
+    TStrings *ObsFiles;
+	TStrings *NavFiles;
+    //TConsole *Console1,*Console2;
+
+	stream_t Stream[2];
+	solbuf_t SolData[2];
+	solstatbuf_t SolStat[2];
+	int SolIndex[2];
+	obs_t Obs;
+    nav_t Nav;
+    sta_t Sta;
+	double *Az,*El,*Mp[NFREQ+NEXOBS],ElMaskData[361];
+	int *CycleSlipMark[NFREQ+NEXOBS];
+	double *Ion[NFREQ+NEXOBS];
+	double *Intervals;
+	//char obstypes[6][NFREQ+NEXOBS][3];  //GREJSC
+	double summaryVal[6][NFREQ+NEXOBS][8];  //输出到word中的各指标项值
+	double summaryVal_sys[6][8];  //各指标项的系统值
+
+    gtime_t OEpoch;
+    int FormWidth,FormHeight;
+    int ConnectState,OpenRaw;
+    int NObs,*IndexObs,ObsIndex;
+    int Week;
+    int Flush,PlotType;
+    int NSolF1,NSolF2,NObsF,NNavF;
+    int SatMask[MAXSAT],SatSel[MAXSAT];
+    int NMapPath;
+    int SimObs;
+    double MapPath[MAXMAPPATH*3];
+
+    int Drag,Xn,Yn;
+    double X0,Y0,Xc,Yc,Xs,Ys,Xcent,Xcent0;
+
+    int GEState,GEDataState[2];
+	double GEHeading;
+
+	//void __fastcall DropFiles    (TWMDropFiles msg);
+	//BEGIN_MESSAGE_MAP // for files drop, cursor key down event
+	//MESSAGE_HANDLER(WM_DROPFILES,TWMDropFiles,DropFiles);
+	//MESSAGE_HANDLER(CM_DIALOGKEY,TWMKey,CMDialogKey);
+	//END_MESSAGE_MAP(TForm);
+
+	UnicodeString __fastcall A2U (AnsiString str);
+
+	void __fastcall ReadWaitStart(void);
+	void __fastcall ReadWaitEnd  (void);
+	void __fastcall ShowLegend   (AnsiString *msgs);
+	int  __fastcall ReadObsRnx   (TStrings *files, obs_t *obs, nav_t *nav, sta_t *sta);
+	void __fastcall TimeSpan     (gtime_t *ts, gtime_t *te, double *tint);
+	void __fastcall ShowMsg      (AnsiString msg);
+	void __fastcall ClearObs     (void);
+	void __fastcall UpdateObs    (int nobs);
+	void __fastcall UpdateSatList(void);
+	void __fastcall UpdateSatSel (void);
+	void __fastcall UpdateMp     (void);
+	void __fastcall UpdateCycleSlipMark  (void);
+	void __fastcall UpdateIon	(void);
+	void __fastcall UpdateType   (int type);
+	void __fastcall SetRange     (int all, double range);
+	void __fastcall FitRange     (int all);
+	TIMEPOS * __fastcall SolToPos (solbuf_t *sol, int index, int qflag, int type);
+	void __fastcall UpdatePlotType(void);
+	void __fastcall PosToXyz     (gtime_t time, const double *rr, int type, double *xyz);
+    void __fastcall CovToXyz     (const double *rr, const float *qr, int type,
+								  double *xyzs);
+	void __fastcall FitTime      (void);
+	double __fastcall TimePos    (gtime_t time);
+	void __fastcall UpdateObsType(void);
+    void __fastcall UpdateTime   (void);
+	void __fastcall UpdateEnable (void);
+	void __fastcall UpdateInfo   (void);
+	//void __fastcall UpdateTimeSol(void);
+    void __fastcall UpdateTimeObs(void);
+    //void __fastcall UpdateInfoSol(void);
+	void __fastcall UpdateInfoObs(void);
+	void __fastcall TimeStr(gtime_t time, int n, int tsys, char *str);
+
+
+
+	void __fastcall DrawTrk      (int level);
+	void __fastcall DrawMark     (TGraph *g, TPoint p, int mark, TColor color, int size,int rot);
+	void __fastcall DrawLabel    (TGraph *g, TPoint p, AnsiString label, int ha, int va);
+	void __fastcall LoadOpt();
+	void __fastcall UpdateColor  (void);
+	void __fastcall UpdateSatMask(void);
+	void __fastcall UpdateOrigin (void);
+	int __fastcall  FitPos       (gtime_t *time, double *opos, double *ovel);
+	void __fastcall Refresh      (void);
+	void __fastcall UpdateSize   (void);
+
+	void __fastcall DrawVisSat      (int level);
+	void __fastcall DrawObsEphem (double *yp);
+	void __fastcall DrawObsSlip  (double *yp);
+	TColor __fastcall ObsColor   (const obsd_t *obs, double az, double el);
+	TColor __fastcall SysColor   (int sat);
+	TColor __fastcall SnrColor   (double snr);
+	TColor __fastcall MpColor    (double mp);
+	void __fastcall MouseDownObs (int X, int Y);
+
+	void __fastcall SetScaleX    (double s);
+	void __fastcall UpdatePoint  (int x, int y);
+	void __fastcall MouseMoveObs (int X, int Y, double dx, double dy, double dxs, double dys);
+	void __fastcall SetCentX     (double c);
+	void __fastcall Clear        (void);
+	void __fastcall ClearSol     (void);
+
+	void __fastcall DrawCNR      (int level);
+	void __fastcall DrawPolyS    (TGraph *graph, double *x, double *y, int n,
+								  TColor color, int style);
+	void __fastcall DrawMP       (int level);
+	void __fastcall DrawEle       (int level);
+	void __fastcall DrawSkyCNR      (int level);
+	void __fastcall DrawSkyMP	(int level);
+	void __fastcall DrawDOP		(int level);
+	void __fastcall DrawDopStat  (double *dop, int *ns, int n);
+	void __fastcall DrawCNREle	(int level);
+	void __fastcall DrawMPEle	(int level);
+
+	//qc
+	void __fastcall ComputeDataIntegrityRate(AnsiString file);
+	void __fastcall ComputeMP(AnsiString file);
+	void __fastcall ComputeCNR(AnsiString file);
+	void __fastcall ComputeCn(AnsiString file);
+	void __fastcall ComputePn(AnsiString file);
+	void __fastcall ComputeObservationPerSlip(AnsiString file);
+	void __fastcall ComputeSlip(AnsiString file);
+	void __fastcall ComputeIon(AnsiString file);
+	void __fastcall ComputeSummary(AnsiString file);
+	void __fastcall WordTest(AnsiString file);
+	//
+	void __fastcall s_ComputeDataIntergirtyRate(int FcodeVal[][NFREQ+NEXOBS]);
+	void __fastcall s_ComputeObservationPerSlip(int FcodeVal[][NFREQ+NEXOBS]);
+	void __fastcall s_ComputeMP();
+	void __fastcall s_ComputeCNR();
+	void __fastcall s_ComputePn(int FcodeVal[][NFREQ+NEXOBS]);
+	void __fastcall s_ComputeCn(int FcodeVal[][NFREQ+NEXOBS]);
+	void __fastcall TrtkplotMainWindow::s_ComputeIon()
+
+public:		// User declarations
+	AnsiString IniFile;
+    AnsiString MapImageFile;
+	AnsiString SkyImageFile;
+	AnsiString RnxOpts;
+    tle_t TLEData;
+
+    // connection settings
+    int RtStream[2];
+    AnsiString RtPath1,RtPath2;
+    AnsiString StrPaths[2][3];
+    AnsiString StrCmds[2][2];
+    int StrCmdEna[2][2];
+    int RtFormat[2];
+    int RtConnType;
+    int RtTimeForm;
+    int RtDegForm;
+    AnsiString RtFieldSep;
+    int RtTimeOutTime;
+    int RtReConnTime;
+
+    // time options
+    int TimeEna[3];
+    gtime_t TimeStart;
+    gtime_t TimeEnd;
+    double TimeInt;
+
+    // map options
+    int MapSize[2],MapScaleEq;
+    double MapScaleX,MapScaleY;
+    double MapLat,MapLon;
+
+    // sky image options
+    int SkySize[2],SkyDestCorr,SkyElMask,SkyRes,SkyFlip;
+    double SkyCent[2],SkyScale,SkyScaleR,SkyFov[3],SkyDest[10];
+
+	// plot options
+    int TimeLabel;
+    int LatLonFmt;
+    int ShowStats;
+    int ShowSlip;
+    int ShowHalfC;
+    int ShowEph;
+    double ElMask;
+    int ElMaskP;
+    int HideLowSat;
+    double MaxDop,MaxMP;
+    int NavSys;
+    AnsiString ExSats;
+    int ShowErr;
+    int ShowArrow;
+    int ShowGLabel;
+    int ShowLabel;
+    int ShowCompass;
+    int ShowScale;
+    int AutoScale;
+    double YRange;
+    int RtBuffSize;
+    int Origin;
+    int RcvPos;
+    double OOPos[3];
+    TColor MColor[2][8]; // {{mark1 0-7},{mark2 0-7}}
+    TColor CColor[4];    // {background,grid,text,line}
+    int PlotStyle;
+    int MarkSize;
+    int AnimCycle;
+    int RefCycle;
+    int Trace;
+    AnsiString QcCmd,QcOpt;
+    AnsiString TLEFile;
+    AnsiString TLESatFile;
+
+    AnsiString Title;
+    AnsiString PntName[MAXWAYPNT];
+    double PntPos[MAXWAYPNT][3];
+    int NWayPnt;
+    int OPosType;
+    double OPos[3],OVel[3];
+
+    AnsiString StrHistory [10];
+    AnsiString StrMntpHist[10];
+
+	__fastcall TrtkplotMainWindow(TComponent* Owner);
+	AnsiString __fastcall U2A(UnicodeString str);
+	int __fastcall CheckObs(AnsiString file);
+	void __fastcall ReadObs(TStrings *files);
+	void __fastcall UpdatePlot(void);
+
+    void __fastcall UpdateDisp   (void);
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TrtkplotMainWindow *rtkplotMainWindow;
+//---------------------------------------------------------------------------
+#endif

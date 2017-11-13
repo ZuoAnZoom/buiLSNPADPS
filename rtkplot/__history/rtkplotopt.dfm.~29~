@@ -1,0 +1,180 @@
+object rtkplotOptDialog: TrtkplotOptDialog
+  Left = 0
+  Top = 0
+  BorderIcons = [biSystemMenu]
+  BorderStyle = bsDialog
+  Caption = #21442#25968#35774#32622
+  ClientHeight = 243
+  ClientWidth = 258
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+  object GroupBox1: TGroupBox
+    Left = 8
+    Top = 8
+    Width = 241
+    Height = 81
+    Caption = #22522#26412#35774#32622
+    Color = clBtnFace
+    ParentBackground = False
+    ParentColor = False
+    TabOrder = 2
+    object checkboxShowStats: TCheckBox
+      Left = 9
+      Top = 24
+      Width = 97
+      Height = 17
+      Caption = #26174#31034#32479#35745#20540
+      TabOrder = 0
+    end
+    object checkboxShowSlip: TCheckBox
+      Left = 136
+      Top = 24
+      Width = 97
+      Height = 17
+      Caption = #26174#31034#21608#36339#26631#35760
+      TabOrder = 1
+    end
+    object checkboxElMaskP: TCheckBox
+      Left = 9
+      Top = 49
+      Width = 105
+      Height = 17
+      Caption = #25130#27490#39640#24230#35282#35774#32622
+      Checked = True
+      State = cbChecked
+      TabOrder = 2
+    end
+    object ElMask: TComboBox
+      Left = 136
+      Top = 47
+      Width = 89
+      Height = 21
+      DropDownCount = 20
+      TabOrder = 3
+      Text = '0'
+      Items.Strings = (
+        '0'
+        '5'
+        '10'
+        '15'
+        '20'
+        '25'
+        '30'
+        '35'
+        '40'
+        '45')
+    end
+  end
+  object GroupBox2: TGroupBox
+    Left = 8
+    Top = 95
+    Width = 241
+    Height = 106
+    Caption = #21355#26143#35774#32622
+    TabOrder = 3
+    object LabelExSats: TLabel
+      Left = 13
+      Top = 68
+      Width = 108
+      Height = 13
+      Caption = #22686#21152#25110#21024#38500#21355#26143#21495#65306
+    end
+    object Label36: TLabel
+      Left = 13
+      Top = 87
+      Width = 61
+      Height = 11
+      Caption = '(+G01 or G01)'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -9
+      Font.Name = 'Tahoma'
+      Font.Style = []
+      ParentFont = False
+    end
+    object NavSys1: TCheckBox
+      Left = 13
+      Top = 19
+      Width = 45
+      Height = 17
+      Caption = 'GPS'
+      Checked = True
+      State = cbChecked
+      TabOrder = 0
+    end
+    object NavSys2: TCheckBox
+      Left = 81
+      Top = 19
+      Width = 69
+      Height = 17
+      Caption = 'GLONASS'
+      TabOrder = 1
+    end
+    object NavSys5: TCheckBox
+      Left = 170
+      Top = 42
+      Width = 57
+      Height = 17
+      Caption = 'SBAS'
+      TabOrder = 4
+    end
+    object NavSys3: TCheckBox
+      Left = 170
+      Top = 19
+      Width = 57
+      Height = 17
+      Caption = 'Galileo'
+      TabOrder = 2
+    end
+    object NavSys4: TCheckBox
+      Left = 81
+      Top = 42
+      Width = 47
+      Height = 17
+      Caption = 'QZSS'
+      TabOrder = 3
+    end
+    object NavSys6: TCheckBox
+      Left = 13
+      Top = 42
+      Width = 57
+      Height = 17
+      Caption = 'BeiDou'
+      TabOrder = 5
+    end
+    object ExSats: TEdit
+      Left = 127
+      Top = 73
+      Width = 98
+      Height = 21
+      TabOrder = 6
+    end
+  end
+  object BtnOk: TButton
+    Left = 39
+    Top = 210
+    Width = 75
+    Height = 25
+    Caption = #30830#23450
+    ModalResult = 1
+    TabOrder = 0
+    OnClick = BtnOkClick
+  end
+  object BtnCancel: TButton
+    Left = 144
+    Top = 210
+    Width = 75
+    Height = 25
+    Caption = #21462#28040
+    ModalResult = 2
+    TabOrder = 1
+  end
+end

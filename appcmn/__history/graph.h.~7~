@@ -1,0 +1,25 @@
+//---------------------------------------------------------------------------
+
+#ifndef graphH
+#define graphH
+//---------------------------------------------------------------------------
+#include <Classes.hpp>
+#include <Controls.hpp>
+#include <StdCtrls.hpp>
+#include <ExtCtrls.hpp>
+
+class TGraph
+{
+private:
+	TPaintBox *parent;
+	int X,Y,Width,Height;
+	double XCent,YCent,XScale,YScale,XTick,YTick;
+	double AutoTick(double scale);
+	double AutoTickTime(double scale);
+	void DrawBox(void);
+	void DrawLabel();
+	void DrawGrid(double xt,double yt);
+};
+
+
+#endif

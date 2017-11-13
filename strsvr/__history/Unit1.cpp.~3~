@@ -1,0 +1,29 @@
+//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#pragma hdrstop
+
+#include "Unit1.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TForm1 *Form1;
+//---------------------------------------------------------------------------
+__fastcall TForm1::TForm1(TComponent* Owner)
+	: TForm(Owner)
+{
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::FormResize(TObject *Sender)
+{
+	this->Panel21->Width = 2*this->Panel2->Width/5;
+	this->Panel22->Width = 3*this->Panel2->Width/5;
+	this->Panel21->Height = this->Panel2->Height;
+	this->Panel22->Height = this->Panel2->Height;
+
+    this->Panel211->Width = this->Panel21->Width;
+	this->Panel212->Width = this->Panel21->Width;
+	this->Panel211->Height = this->Panel21->Height/3;
+	this->Panel212->Height = 2*this->Panel21->Height/3;
+}
+//---------------------------------------------------------------------------

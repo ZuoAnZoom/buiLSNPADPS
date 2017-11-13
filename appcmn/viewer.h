@@ -1,0 +1,48 @@
+//---------------------------------------------------------------------------
+
+#ifndef viewerH
+#define viewerH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.ComCtrls.hpp>
+#include <Vcl.ExtCtrls.hpp>
+
+#define MAXLINE		20000
+
+//---------------------------------------------------------------------------
+class TTextViewer : public TForm
+{
+__published:	// IDE-managed Components
+	TRichEdit *Text;
+	TPanel *Panel1;
+	TButton *BtnFind;
+	TEdit *FindStr;
+	void __fastcall FormShow(TObject *Sender);
+	void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
+	void __fastcall BtnFindClick(TObject *Sender);
+	void __fastcall FindStrKeyPress(TObject *Sender, System::WideChar &Key);
+	void __fastcall FormResize(TObject *Sender);
+
+private:	// User declarations
+	AnsiString File;
+	wchar_t *TextStr;
+
+	void __fastcall ReadText(AnsiString file);
+	void __fastcall UpdateText(void);
+
+public:		// User declarations
+	int Option;
+	static TColor Color1,Color2;
+	static TFont *FontD;
+
+	__fastcall TTextViewer(TComponent* Owner);
+	void __fastcall Read(AnsiString file);
+
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TTextViewer *TextViewer;
+//---------------------------------------------------------------------------
+#endif

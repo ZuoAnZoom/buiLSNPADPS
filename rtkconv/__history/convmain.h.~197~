@@ -1,0 +1,197 @@
+//---------------------------------------------------------------------------
+
+#ifndef convmainH
+#define convmainH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.ExtCtrls.hpp>
+#include <Vcl.Buttons.hpp>
+#include <Vcl.Dialogs.hpp>
+
+#include "rtklib.h"
+#include <Vcl.ComCtrls.hpp>
+
+#define NFREQ       6
+#define NEXOBS      3
+
+//---------------------------------------------------------------------------
+class TconvMainWindow : public TForm
+{
+__published:	// IDE-managed Components
+	TPanel *Panel1;
+	TPanel *Panel2;
+	TPanel *Panel21;
+	TPanel *Panel22;
+	TPanel *Panel211;
+	TPanel *Panel212;
+	TSpeedButton *BtnInFile;
+	TSpeedButton *BtnConvert;
+	TGroupBox *GroupBoxRawData;
+	TGroupBox *GroupBoxFormat;
+	TComboBox *ComFormat;
+	TEdit *InFile;
+	TSpeedButton *BtnInFileView;
+	TGroupBox *GroupBoxConvData;
+	TSpeedButton *BtnOutFileView1;
+	TSpeedButton *BtnOutFileView2;
+	TSpeedButton *BtnOutFileView3;
+	TSpeedButton *BtnOutFileView4;
+	TSpeedButton *BtnOutFileView5;
+	TSpeedButton *BtnOutFileView6;
+	TEdit *OutFile1;
+	TCheckBox *OutFileEna1;
+	TEdit *OutFile2;
+	TCheckBox *OutFileEna2;
+	TEdit *OutFile3;
+	TCheckBox *OutFileEna3;
+	TEdit *OutFile4;
+	TCheckBox *OutFileEna4;
+	TEdit *OutFile5;
+	TCheckBox *OutFileEna5;
+	TEdit *OutFile6;
+	TCheckBox *OutFileEna6;
+	TEdit *OutFile7;
+	TSpeedButton *BtnOutFileView7;
+	TCheckBox *OutFileEna7;
+	TGroupBox *GroupBoxConvOpt;
+	TOpenDialog *OpenDialog;
+	TLabel *Message;
+	TPanel *PanelRnxVer;
+	TLabel *Label1;
+	TComboBox *ComRnxVer;
+	TPanel *PanelRnxCode;
+	TLabel *Label2;
+	TEdit *EditRnxCode;
+	TCheckBox *CheckRnxFile;
+	TPanel *PanelRnxFile;
+	TPanel *PanelMarker;
+	TLabel *Label3;
+	TEdit *EditMarker;
+	TEdit *EditMarkerNo;
+	TEdit *EditMarkerType;
+	TPanel *PanelROA;
+	TLabel *Label4;
+	TEdit *EditName1;
+	TEdit *EditName0;
+	TEdit *EditRunBy;
+	TPanel *PanelRec;
+	TLabel *Label5;
+	TEdit *EditRec2;
+	TEdit *EditRec1;
+	TEdit *EditRec0;
+	TPanel *PanelAnt;
+	TLabel *Label6;
+	TEdit *EditAnt2;
+	TEdit *EditAnt1;
+	TEdit *EditAnt0;
+	TPanel *PanelXYZ;
+	TLabel *Label7;
+	TEdit *EditAppPos1;
+	TEdit *EditAppPos2;
+	TEdit *EditAppPos0;
+	TPanel *PanelHEN;
+	TLabel *Label8;
+	TEdit *EditAntDel2;
+	TEdit *EditAntDel1;
+	TEdit *EditAntDel0;
+	TGroupBox *GroupBoxNavSys;
+	TLabel *LabelExSats;
+	TCheckBox *NavSys1;
+	TCheckBox *NavSys2;
+	TCheckBox *NavSys5;
+	TCheckBox *NavSys3;
+	TCheckBox *NavSys4;
+	TCheckBox *NavSys6;
+	TEdit *EditExSats;
+	TGroupBox *GroupBoxTimeFirst;
+	TGroupBox *GroupBoxFre;
+	TEdit *FirstTimeH1;
+	TUpDown *FirstTimeH1UD;
+	TEdit *FirstTimeY1;
+	TUpDown *FirstTimeY1UD;
+	TGroupBox *GroupBoxTimeLast;
+	TEdit *LastTimeH1;
+	TUpDown *LastTimeH1UD;
+	TEdit *LastTimeY1;
+	TUpDown *LastTimeY1UD;
+	TPanel *PanelInterval;
+	TLabel *Label9;
+	TEdit *EditInterval;
+	TPanel *PanelLeapSec;
+	TLabel *Label10;
+	TEdit *EditLeapSec;
+	TCheckBox *Freq1;
+	TCheckBox *Freq2;
+	TCheckBox *Freq3;
+	TCheckBox *Freq6;
+	TCheckBox *Freq5;
+	TCheckBox *Freq4;
+	TCheckBox *CheckScanObs;
+	TButton *BtnMask;
+	TGroupBox *GroupBoxObsType;
+	TCheckBox *Obs1;
+	TCheckBox *Obs2;
+	TCheckBox *Obs3;
+	TCheckBox *Obs4;
+	TButton *BtnOk;
+	TButton *BtnCancel;
+	TPanel *PanelIL;
+	TPanel *PanelBtn;
+	void __fastcall FormResize(TObject *Sender);
+	void __fastcall BtnInFileClick(TObject *Sender);
+	void __fastcall FormCreate(TObject *Sender);
+	void __fastcall FormShow(TObject *Sender);
+	void __fastcall BtnInFileViewClick(TObject *Sender);
+	void __fastcall BtnConvertClick(TObject *Sender);
+	void __fastcall BtnOutFileView1Click(TObject *Sender);
+	void __fastcall BtnOutFileView2Click(TObject *Sender);
+	void __fastcall BtnOutFileView3Click(TObject *Sender);
+	void __fastcall BtnOutFileView4Click(TObject *Sender);
+	void __fastcall BtnOutFileView5Click(TObject *Sender);
+	void __fastcall BtnOutFileView6Click(TObject *Sender);
+	void __fastcall BtnOutFileView7Click(TObject *Sender);
+	void __fastcall InFileChange(TObject *Sender);
+	void __fastcall ComFormatChange(TObject *Sender);
+	void __fastcall FirstTimeY1UDChangingEx(TObject *Sender, bool &AllowChange, short NewValue,
+          TUpDownDirection Direction);
+	void __fastcall FirstTimeH1UDChangingEx(TObject *Sender, bool &AllowChange, short NewValue,
+          TUpDownDirection Direction);
+	void __fastcall LastTimeY1UDChangingEx(TObject *Sender, bool &AllowChange, short NewValue,
+          TUpDownDirection Direction);
+	void __fastcall LastTimeH1UDChangingEx(TObject *Sender, bool &AllowChange, short NewValue,
+          TUpDownDirection Direction);
+	void __fastcall BtnOkClick(TObject *Sender);
+	void __fastcall BtnCancelClick(TObject *Sender);
+	void __fastcall BtnMaskClick(TObject *Sender);
+	void __fastcall ComRnxVerChange(TObject *Sender);
+
+
+private:	// User declarations
+	AnsiString IniFile,CmdPostExe;
+
+	void __fastcall SetConvOptVal(AnsiString infile);
+	void __fastcall SetOutFiles(AnsiString infile);
+	void __fastcall LoadOpt(void);
+	void __fastcall TconvMainWindow::UpdateEnable(void);
+	AnsiString __fastcall RepPath(AnsiString File);
+	void __fastcall ConvertFile(void);
+
+public:		// User declarations
+    gtime_t RnxTime;
+	AnsiString RunBy,Marker,MarkerNo,MarkerType,Name[2],Rec[3],Ant[3];
+	AnsiString RnxCode,Comment[2],RcvOption,ExSats;
+	AnsiString CodeMask[6];
+	double AppPos[3],AntDel[3];
+	int RnxVer,RnxFile,NavSys,ObsType,FreqType,TraceLevel,EventEna;
+	int AutoPos,ScanObs,OutIono,OutTime,OutLeaps;
+
+	__fastcall TconvMainWindow(TComponent* Owner);
+
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TconvMainWindow *convMainWindow;
+//---------------------------------------------------------------------------
+#endif

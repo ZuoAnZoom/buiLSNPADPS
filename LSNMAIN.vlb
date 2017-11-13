@@ -1,0 +1,15 @@
+﻿[]
+Coordinates=270,111,86,36
+
+[strsvrgroup]
+Coordinates=88,55,79,36
+
+[aogroup]
+Coordinates=0,0,62,36
+
+[rtkconvgroup]
+Coordinates=270,1,89,36
+
+[rtkplotgroup]
+Coordinates=270,56,83,36
+

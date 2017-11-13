@@ -1,0 +1,18 @@
+//---------------------------------------------------------------------------
+
+#ifndef graphH
+#define graphH
+//---------------------------------------------------------------------------
+#include <Classes.hpp>
+#include <Controls.hpp>
+#include <StdCtrls.hpp>
+#include <ExtCtrls.hpp>
+
+class TGraph
+{
+private:
+	TPaintBox *parent;
+};
+
+
+#endif

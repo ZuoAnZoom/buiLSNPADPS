@@ -1,0 +1,38 @@
+//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#pragma hdrstop
+
+#include "serioptdlg.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TSerialOptDialog *SerialOptDialog;
+//---------------------------------------------------------------------------
+__fastcall TSerialOptDialog::TSerialOptDialog(TComponent* Owner)
+	: TForm(Owner)
+{
+	Opt = 0;
+}
+//---------------------------------------------------------------------------
+void __fastcall TSerialOptDialog::FormShow(TObject *Sender)
+{
+	char *p,*q,path[1024];
+
+	UpdatePortList();
+	strcpy(path,Path.c_str());
+	if (!(q=strchr(p=path,':'))) return; else *q='\0';
+	Port->Text=p;
+	if (!(q=strchr(p=q+1,':'))) return; else *q='\0';
+	BitRate->Text=p;
+	if (!(q=strchr(p=q+1,':'))) return; else *q='\0';
+	ByteSize->ItemIndex=!strcmp(p,"7")?0:1;
+	if (!(q=strchr(p=q+1,':'))) return; else *q='\0';
+	Parity->ItemIndex=!strcmp(p,"n")?0:(!strcmp(p,"e")?1:2);
+	if (!(q=strchr(p=q+1,':'))) return; else *q='\0';
+	StopBits->ItemIndex=!strcmp(p,"1")?0:1;
+	p=q+1;
+	FlowCtr->ItemIndex=!strcmp(p,"off")?0:(!strcmp(p,"xon")?1:2);
+	BtnCmd->Visible=Opt;
+}
+//---------------------------------------------------------------------------

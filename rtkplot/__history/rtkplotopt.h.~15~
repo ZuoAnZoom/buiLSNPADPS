@@ -1,0 +1,44 @@
+//---------------------------------------------------------------------------
+
+#ifndef rtkplotoptH
+#define rtkplotoptH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+
+#include "rtkplotmain.h"
+
+//---------------------------------------------------------------------------
+class TrtkplotOptDialog : public TForm
+{
+__published:	// IDE-managed Components
+	TLabel *LabelExSats;
+	TLabel *Label36;
+	TEdit *ExSats;
+	TComboBox *ElMask;
+	TCheckBox *checkboxShowStats;
+	TCheckBox *checkboxShowSlip;
+	TCheckBox *checkboxElMaskP;
+	TGroupBox *GroupBox1;
+	TGroupBox *GroupBox2;
+	TCheckBox *NavSys1;
+	TCheckBox *NavSys2;
+	TCheckBox *NavSys5;
+	TCheckBox *NavSys3;
+	TCheckBox *NavSys4;
+	TCheckBox *NavSys6;
+	TButton *BtnOk;
+	TButton *BtnCancel;
+	void __fastcall FormShow(TObject *Sender);
+	void __fastcall BtnOkClick(TObject *Sender);
+private:	// User declarations
+public:		// User declarations
+	TrtkplotMainWindow *Plot;
+	__fastcall TrtkplotOptDialog(TComponent* Owner);
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TrtkplotOptDialog *rtkplotOptDialog;
+//---------------------------------------------------------------------------
+#endif
